@@ -46,7 +46,6 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  poweredBy: false,
   async headers() {
     return [
       {
