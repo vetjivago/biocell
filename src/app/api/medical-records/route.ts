@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const {
-    patientId, unitId, pathology, cellQuantity, applicationRoute,
+    patientName, patientSpecies, unitId, pathology, cellQuantity, applicationRoute,
     donors, serumCollected, applications, thawings,
   } = body;
 
-  if (!patientId || !unitId || !pathology) {
+  if (!patientName || !patientSpecies || !unitId || !pathology) {
     return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
@@ -49,9 +49,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 
+  const patient = await prisma.patient.create({
+    data: {
+      name: patientName,
+      species: patientSpecies,
+      ownerName: "",
+      unitId,
+    },
+  });
+
   const record = await prisma.medicalRecord.create({
     data: {
-      patientId,
+      patientId: patient.id,
       unitId,
       professionalId: session.id,
       pathology,
@@ -86,7 +95,7 @@ export async function POST(request: NextRequest) {
   await prisma.auditLog.create({
     data: {
       userId: session.id, action: "CREATE", entity: "MedicalRecord",
-      entityId: record.id, details: JSON.stringify({ patientName: record.patient.name, pathology }),
+      entityId: record.id, details: JSON.stringify({ patientName: patient.name, pathology }),
     },
   });
 

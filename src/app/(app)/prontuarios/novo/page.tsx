@@ -6,15 +6,13 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 interface Unit { id: string; name: string; }
-interface Patient { id: string; name: string; species: string; breed?: string; ownerName: string; }
 
 export default function NovoProntuarioPage() {
   const router = useRouter();
   const [units, setUnits] = useState<Unit[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    patientId: "", unitId: "",
+    patientName: "", patientSpecies: "", unitId: "",
     pathology: "", cellQuantity: "", applicationRoute: "",
     donors: "", serumCollected: false,
   });
@@ -28,12 +26,6 @@ export default function NovoProntuarioPage() {
   useEffect(() => {
     fetch("/api/units").then((r) => r.json()).then(setUnits);
   }, []);
-
-  useEffect(() => {
-    if (form.unitId) {
-      fetch(`/api/patients/by-unit?unitId=${form.unitId}`).then((r) => r.json()).then(setPatients);
-    }
-  }, [form.unitId]);
 
   function update(field: string, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -93,13 +85,19 @@ export default function NovoProntuarioPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Paciente (Animal) *</label>
-              <select required value={form.patientId} onChange={(e) => update("patientId", e.target.value)}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Paciente (Animal) *</label>
+              <input required value={form.patientName} onChange={(e) => update("patientName", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Ex: Rex" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Espécie *</label>
+              <select required value={form.patientSpecies} onChange={(e) => update("patientSpecies", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 <option value="">Selecione...</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.species}) – {p.ownerName}</option>
-                ))}
+                <option value="Canino">Canino</option>
+                <option value="Felino">Felino</option>
+                <option value="Equino">Equino</option>
               </select>
             </div>
           </div>

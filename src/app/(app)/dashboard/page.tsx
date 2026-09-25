@@ -78,19 +78,29 @@ export default async function DashboardPage() {
 
   const data = await getDashboardData(session);
 
-  const stats = [
-    { label: "Unidades Ativas", value: data.totalUnits, icon: Building2, color: "bg-blue-500" },
-    { label: "Pacientes", value: data.totalPatients, icon: Users, color: "bg-green-500" },
-    { label: "Prontuários", value: data.totalRecords, icon: ClipboardList, color: "bg-purple-500" },
-    { label: "Em Atendimento", value: data.openRecords, icon: TrendingUp, color: "bg-orange-500" },
-  ];
+  const isAdmin = session.role === "ADMIN";
+  const totalStock = data.stockByUnit.reduce((sum, s) => sum + s.totalStraws, 0);
+
+  const stats = isAdmin
+    ? [
+        { label: "Unidades Ativas", value: data.totalUnits, icon: Building2, color: "bg-blue-500" },
+        { label: "Pacientes", value: data.totalPatients, icon: Users, color: "bg-green-500" },
+        { label: "Prontuários", value: data.totalRecords, icon: ClipboardList, color: "bg-purple-500" },
+        { label: "Em Atendimento", value: data.openRecords, icon: TrendingUp, color: "bg-orange-500" },
+      ]
+    : [
+        { label: "Palhetas em Estoque", value: totalStock, icon: Package, color: "bg-blue-500" },
+        { label: "Pacientes", value: data.totalPatients, icon: Users, color: "bg-green-500" },
+        { label: "Prontuários", value: data.totalRecords, icon: ClipboardList, color: "bg-purple-500" },
+        { label: "Em Atendimento", value: data.openRecords, icon: TrendingUp, color: "bg-orange-500" },
+      ];
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {session.role === "ADMIN" ? "Visão consolidada de todas as unidades" : "Visão da sua unidade"}
+          {isAdmin ? "Visão consolidada de todas as unidades" : "Visão da sua unidade"}
         </p>
       </div>
 
@@ -183,13 +193,12 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {session.role === "ADMIN" && (
+        {data.stockByUnit.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
-            <h2 className="font-semibold text-gray-900 mb-4">Estoque por Unidade (palhetas)</h2>
-            {data.stockByUnit.length === 0 ? (
-              <p className="text-sm text-gray-400 py-8 text-center">Nenhum estoque registrado</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <h2 className="font-semibold text-gray-900 mb-4">
+              {isAdmin ? "Estoque por Unidade (palhetas)" : "Estoque da Unidade (palhetas)"}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {data.stockByUnit
                   .sort((a, b) => a.totalStraws - b.totalStraws)
                   .map((s) => (
@@ -201,7 +210,6 @@ export default async function DashboardPage() {
                     </div>
                   ))}
               </div>
-            )}
           </div>
         )}
       </div>
