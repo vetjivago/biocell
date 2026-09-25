@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Organização e Unidades ──────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  units     Unit[]
+  users     User[]
+}
+
+model Unit {
+  id             String       @id @default(cuid())
+  name           String
+  city           String
+  state          String
+  address        String?
+  phone          String?
+  species        String
+  active         Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  users               UserUnit[]
+  patients             Patient[]
+  medicalRecords       MedicalRecord[]
+  inventoryTransactions InventoryTransaction[]
+  stockThresholds      StockThreshold[]
+  alerts               Alert[]
+  shipmentsSent        Shipment[]       @relation("ShipmentFrom")
+  shipmentsReceived    Shipment[]       @relation("ShipmentTo")
+
+  @@index([organizationId])
+}
+
+// ── Usuários e Permissões ───────────────────────────────────────
+
+model User {
+  id             String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  passwordHash   String
+  role           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  units          UserUnit[]
+  medicalRecords MedicalRecord[]
+  auditLogs      AuditLog[]
+
+  @@index([organizationId])
+}
+
+model UserUnit {
+  id     String @id @default(cuid())
+  userId String
+  unitId String
+  user   User   @relation(fields: [userId], references: [id])
+  unit   Unit   @relation(fields: [unitId], references: [id])
+
+  @@unique([userId, unitId])
+  @@index([unitId])
+}
+
+// ── Pacientes (Animais) ─────────────────────────────────────────
+
+model Patient {
+  id              String   @id @default(cuid())
+  name            String
+  serialNumber    String?
+  species         String
+  breed           String?
+  weight          Float?
+  ownerName       String
+  ownerPhone      String?
+  ownerEmail      String?
+  veterinarian    String?
+  clinic          String?
+  unitId          String
+  unit            Unit     @relation(fields: [unitId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  medicalRecords  MedicalRecord[]
+
+  @@index([unitId])
+}
+
+// ── Prontuário Eletrônico ───────────────────────────────────────
+
+model MedicalRecord {
+  id                String   @id @default(cuid())
+  serialNumber      String   @unique @default(cuid())
+  patientId         String
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  unitId            String
+  unit              Unit     @relation(fields: [unitId], references: [id])
+  professionalId    String
+  professional      User     @relation(fields: [professionalId], references: [id])
+
+  pathology         String
+  cellQuantity      String?
+  applicationRoute  String?
+  donors            String?
+  serumCollected    Boolean  @default(false)
+
+  status            String   @default("OPEN")
+  requestDate       DateTime @default(now())
+  completedAt       DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  applications      Application[]
+  thawings          Thawing[]
+  procedures        Procedure[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@index([patientId])
+  @@index([unitId])
+  @@index([professionalId])
+  @@index([status])
+}
+
+model Application {
+  id              String        @id @default(cuid())
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  number          Int
+  date            DateTime?
+  cells           String?
+  serum           String?
+  medium          String?
+  notes           String?
+
+  @@index([medicalRecordId])
+}
+
+model Thawing {
+  id                String        @id @default(cuid())
+  medicalRecordId   String
+  medicalRecord     MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  number            Int
+  thawedStraws      Int?
+  retrievalLocation String?
+  notes             String?
+
+  @@index([medicalRecordId])
+}
+
+model Procedure {
+  id              String        @id @default(cuid())
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  date            DateTime
+  description     String
+  observations    String?
+  technician      String?
+
+  @@index([medicalRecordId])
+}
+
+// ── Produtos Celulares e Lotes ──────────────────────────────────
+
+model CellProduct {
+  id          String      @id @default(cuid())
+  name        String
+  code        String?
+  description String?
+  species     String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  batches     CellBatch[]
+}
+
+model CellBatch {
+  id            String      @id @default(cuid())
+  batchNumber   String
+  productId     String
+  product       CellProduct @relation(fields: [productId], references: [id])
+  manufacturingDate DateTime?
+  expirationDate    DateTime?
+  totalStraws       Int
+  storageConditions String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+
+  inventoryTransactions InventoryTransaction[]
+  shipmentItems         ShipmentItem[]
+
+  @@index([productId])
+}
+
+// ── Estoque (Ledger de Movimentações) ───────────────────────────
+
+model InventoryTransaction {
+  id              String        @id @default(cuid())
+  unitId          String
+  unit            Unit          @relation(fields: [unitId], references: [id])
+  batchId         String
+  batch           CellBatch     @relation(fields: [batchId], references: [id])
+  type            String
+  quantity        Int
+  balance         Int
+  medicalRecordId String?
+  medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
+  shipmentId      String?
+  reason          String?
+  performedBy     String?
+  createdAt       DateTime      @default(now())
+
+  @@index([unitId])
+  @@index([batchId])
+  @@index([medicalRecordId])
+  @@index([type])
+}
+
+// ── Limites de Estoque e Alertas ────────────────────────────────
+
+model StockThreshold {
+  id            String @id @default(cuid())
+  unitId        String
+  unit          Unit   @relation(fields: [unitId], references: [id])
+  productName   String
+  minimumStraws Int
+  createdAt     DateTime @default(now())
+
+  @@unique([unitId, productName])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  unitId    String
+  unit      Unit     @relation(fields: [unitId], references: [id])
+  type      String
+  message   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([unitId])
+  @@index([resolved])
+}
+
+// ── Remessas (Matriz → Unidade) ─────────────────────────────────
+
+model Shipment {
+  id          String   @id @default(cuid())
+  fromUnitId  String
+  fromUnit    Unit     @relation("ShipmentFrom", fields: [fromUnitId], references: [id])
+  toUnitId    String
+  toUnit      Unit     @relation("ShipmentTo", fields: [toUnitId], references: [id])
+  status      String   @default("PENDING")
+  shippedAt   DateTime?
+  receivedAt  DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  items       ShipmentItem[]
+
+  @@index([fromUnitId])
+  @@index([toUnitId])
+}
+
+model ShipmentItem {
+  id          String    @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id])
+  batchId     String
+  batch       CellBatch @relation(fields: [batchId], references: [id])
+  quantity    Int
+
+  @@index([shipmentId])
+  @@index([batchId])
+}
+
+// ── Auditoria ───────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   String?
+  details    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ── Contatos de Follow-up (C1 e C15 do verso do prontuário) ────
+
+model FollowUpContact {
+  id              String   @id @default(cuid())
+  medicalRecordId String
+  contactType     String
+  date            DateTime?
+  responsible     String?
+  observations    String?
+  createdAt       DateTime @default(now())
+
+  @@index([medicalRecordId])
+}
