@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle } from "lucide-react";
+import SupplyForm from "./SupplyForm";
 
 export default async function EstoquePage() {
   const session = await getSession();
@@ -66,11 +67,14 @@ export default async function EstoquePage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Estoque de Células</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Estoque de Células</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
+          </p>
+        </div>
+        {isAdmin && <SupplyForm />}
       </div>
 
       {/* Resumo */}

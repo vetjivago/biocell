@@ -51,3 +51,5 @@ prisma/dev.db-journal
 .cursor/
 .devin/
 .agents/
+
+.vercel
