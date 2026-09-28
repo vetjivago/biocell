@@ -37,14 +37,46 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { unitId, batchId, type, quantity, reason } = body;
+  const { unitId, batchId, batchNumber, productName, type, quantity, reason } = body;
 
-  if (!unitId || !batchId || !type || !quantity) {
+  if (!unitId || !type || !quantity) {
     return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
   }
 
+  let resolvedBatchId = batchId;
+
+  if (!resolvedBatchId && batchNumber && productName) {
+    let product = await prisma.cellProduct.findFirst({
+      where: { name: { equals: productName, mode: "insensitive" } },
+    });
+    if (!product) {
+      product = await prisma.cellProduct.create({
+        data: { name: productName },
+      });
+    }
+
+    let batch = await prisma.cellBatch.findFirst({
+      where: { batchNumber, productId: product.id },
+    });
+    if (!batch) {
+      batch = await prisma.cellBatch.create({
+        data: {
+          batchNumber,
+          productId: product.id,
+          totalStraws: 0,
+        },
+      });
+    }
+
+    resolvedBatchId = batch.id;
+  }
+
+  if (!resolvedBatchId) {
+    return Response.json({ error: "Informe o lote e produto" }, { status: 400 });
+  }
+
   const existing = await prisma.inventoryTransaction.findMany({
-    where: { unitId, batchId },
+    where: { unitId, batchId: resolvedBatchId },
   });
   const currentBalance = existing.reduce((sum, t) => sum + t.quantity, 0);
   const newBalance = currentBalance + quantity;
@@ -54,13 +86,24 @@ export async function POST(request: NextRequest) {
   }
 
   const transaction = await prisma.inventoryTransaction.create({
-    data: { unitId, batchId, type, quantity, balance: newBalance, reason, performedBy: session.name },
+    data: {
+      unitId,
+      batchId: resolvedBatchId,
+      type,
+      quantity,
+      balance: newBalance,
+      reason,
+      performedBy: session.name,
+    },
   });
 
   await prisma.auditLog.create({
     data: {
-      userId: session.id, action: type, entity: "InventoryTransaction",
-      entityId: transaction.id, details: JSON.stringify({ unitId, batchId, quantity, newBalance }),
+      userId: session.id,
+      action: type,
+      entity: "InventoryTransaction",
+      entityId: transaction.id,
+      details: JSON.stringify({ unitId, batchId: resolvedBatchId, quantity, newBalance }),
     },
   });
 

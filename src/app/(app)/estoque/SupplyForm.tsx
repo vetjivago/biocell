@@ -5,11 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, X, Loader2 } from "lucide-react";
 
 type Unit = { id: string; name: string };
-type Batch = {
-  id: string;
-  batchNumber: string;
-  product: { name: string; code: string | null; species: string | null };
-};
 
 export default function SupplyForm() {
   const router = useRouter();
@@ -19,25 +14,19 @@ export default function SupplyForm() {
 
   const [open, setOpen] = useState(autoOpen);
   const [units, setUnits] = useState<Unit[]>([]);
-  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [unitId, setUnitId] = useState(preselectedUnitId);
-  const [batchId, setBatchId] = useState("");
+  const [productName, setProductName] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    Promise.all([
-      fetch("/api/units").then((r) => r.json()),
-      fetch("/api/batches").then((r) => r.json()),
-    ]).then(([u, b]) => {
-      setUnits(u);
-      setBatches(b);
-    });
+    fetch("/api/units").then((r) => r.json()).then(setUnits);
   }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,7 +47,8 @@ export default function SupplyForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         unitId,
-        batchId,
+        productName,
+        batchNumber,
         type: "RECEIPT",
         quantity: qty,
         reason: reason || "Abastecimento pela matriz",
@@ -68,7 +58,8 @@ export default function SupplyForm() {
     if (res.ok) {
       setSuccess("Estoque atualizado com sucesso!");
       setUnitId("");
-      setBatchId("");
+      setProductName("");
+      setBatchNumber("");
       setQuantity("");
       setReason("");
       router.refresh();
@@ -94,8 +85,6 @@ export default function SupplyForm() {
       </button>
     );
   }
-
-  const selectedBatch = batches.find((b) => b.id === batchId);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
@@ -123,25 +112,27 @@ export default function SupplyForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Produto / Lote</label>
-          <select
-            value={batchId}
-            onChange={(e) => setBatchId(e.target.value)}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Produto</label>
+          <input
+            type="text"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
             required
+            placeholder="Ex: CTM Alogênica Canina"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="">Selecione o lote...</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.product.name} – Lote {b.batchNumber} {b.product.species ? `(${b.product.species})` : ""}
-              </option>
-            ))}
-          </select>
-          {selectedBatch && (
-            <p className="text-xs text-gray-400 mt-1">
-              {selectedBatch.product.name} {selectedBatch.product.code ? `(${selectedBatch.product.code})` : ""}
-            </p>
-          )}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lote</label>
+          <input
+            type="text"
+            value={batchNumber}
+            onChange={(e) => setBatchNumber(e.target.value)}
+            required
+            placeholder="Ex: 04.001.2026"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+          />
         </div>
 
         <div>
@@ -157,7 +148,7 @@ export default function SupplyForm() {
           />
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Observação (opcional)</label>
           <input
             type="text"
