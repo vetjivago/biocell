@@ -7,7 +7,9 @@ import {
   Package,
   AlertTriangle,
   TrendingUp,
+  ChevronRight,
 } from "lucide-react";
+import Link from "next/link";
 
 async function getDashboardData(session: { role: string; unitIds: string[] }) {
   const isAdmin = session.role === "ADMIN";
@@ -121,15 +123,18 @@ export default async function DashboardPage() {
       </div>
 
       {data.lowStockAlerts > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 flex items-center gap-3">
-          <AlertTriangle className="text-amber-500" size={22} />
-          <div>
-            <p className="font-medium text-amber-800">
-              {data.lowStockAlerts} {data.lowStockAlerts === 1 ? "alerta" : "alertas"} de estoque baixo
-            </p>
-            <p className="text-sm text-amber-600">Verifique as unidades que precisam de reposição</p>
+        <Link href="/alertas" className="block bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 hover:bg-amber-100 transition-colors">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="text-amber-500 shrink-0" size={22} />
+            <div className="flex-1">
+              <p className="font-medium text-amber-800">
+                {data.lowStockAlerts} {data.lowStockAlerts === 1 ? "alerta" : "alertas"} de estoque baixo
+              </p>
+              <p className="text-sm text-amber-600">Verifique as unidades que precisam de reposição</p>
+            </div>
+            <ChevronRight className="text-amber-400 shrink-0" size={20} />
           </div>
-        </div>
+        </Link>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
