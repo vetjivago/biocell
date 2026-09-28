@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, X, Loader2 } from "lucide-react";
 
 type Unit = { id: string; name: string };
@@ -13,14 +13,18 @@ type Batch = {
 
 export default function SupplyForm() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const preselectedUnitId = searchParams.get("unitId") || "";
+  const autoOpen = searchParams.get("supply") === "true";
+
+  const [open, setOpen] = useState(autoOpen);
   const [units, setUnits] = useState<Unit[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [unitId, setUnitId] = useState("");
+  const [unitId, setUnitId] = useState(preselectedUnitId);
   const [batchId, setBatchId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");

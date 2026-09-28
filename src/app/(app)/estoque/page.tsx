@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle } from "lucide-react";
@@ -74,7 +75,7 @@ export default async function EstoquePage() {
             {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
           </p>
         </div>
-        {isAdmin && <SupplyForm />}
+        {isAdmin && <Suspense><SupplyForm /></Suspense>}
       </div>
 
       {/* Resumo */}
