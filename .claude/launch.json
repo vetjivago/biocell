@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "biocell-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\jivag\\OneDrive\\Documentos\\Hilana\\biocell && npm run dev"],
       "port": 3000
     }
   ]
