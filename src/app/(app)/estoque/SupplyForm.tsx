@@ -2,9 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, X, Loader2 } from "lucide-react";
+import { Plus, X, Loader2, PenLine } from "lucide-react";
 
 type Unit = { id: string; name: string };
+type Batch = {
+  id: string;
+  batchNumber: string;
+  product: { name: string; code: string | null; species: string | null };
+};
 
 export default function SupplyForm() {
   const router = useRouter();
@@ -13,12 +18,15 @@ export default function SupplyForm() {
   const autoOpen = searchParams.get("supply") === "true";
 
   const [open, setOpen] = useState(autoOpen);
+  const [manual, setManual] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [unitId, setUnitId] = useState(preselectedUnitId);
+  const [batchId, setBatchId] = useState("");
   const [productName, setProductName] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -26,7 +34,13 @@ export default function SupplyForm() {
 
   useEffect(() => {
     if (!open) return;
-    fetch("/api/units").then((r) => r.json()).then(setUnits);
+    Promise.all([
+      fetch("/api/units").then((r) => r.json()),
+      fetch("/api/batches").then((r) => r.json()),
+    ]).then(([u, b]) => {
+      setUnits(u);
+      setBatches(b);
+    });
   }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -42,22 +56,30 @@ export default function SupplyForm() {
       return;
     }
 
+    const payload: Record<string, unknown> = {
+      unitId,
+      type: "RECEIPT",
+      quantity: qty,
+      reason: reason || "Abastecimento pela matriz",
+    };
+
+    if (manual) {
+      payload.productName = productName;
+      payload.batchNumber = batchNumber;
+    } else {
+      payload.batchId = batchId;
+    }
+
     const res = await fetch("/api/inventory", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        unitId,
-        productName,
-        batchNumber,
-        type: "RECEIPT",
-        quantity: qty,
-        reason: reason || "Abastecimento pela matriz",
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (res.ok) {
       setSuccess("Estoque atualizado com sucesso!");
       setUnitId("");
+      setBatchId("");
       setProductName("");
       setBatchNumber("");
       setQuantity("");
@@ -66,6 +88,7 @@ export default function SupplyForm() {
       setTimeout(() => {
         setOpen(false);
         setSuccess("");
+        setManual(false);
       }, 1500);
     } else {
       const data = await res.json();
@@ -90,7 +113,7 @@ export default function SupplyForm() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-gray-900">Abastecer Unidade</h2>
-        <button onClick={() => { setOpen(false); setError(""); setSuccess(""); }} className="text-gray-400 hover:text-gray-600">
+        <button onClick={() => { setOpen(false); setError(""); setSuccess(""); setManual(false); }} className="text-gray-400 hover:text-gray-600">
           <X size={20} />
         </button>
       </div>
@@ -111,29 +134,68 @@ export default function SupplyForm() {
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Produto</label>
-          <input
-            type="text"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-            required
-            placeholder="Ex: CTM Alogênica Canina"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Lote</label>
-          <input
-            type="text"
-            value={batchNumber}
-            onChange={(e) => setBatchNumber(e.target.value)}
-            required
-            placeholder="Ex: 04.001.2026"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
+        {!manual ? (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700">Produto / Lote</label>
+              <button
+                type="button"
+                onClick={() => setManual(true)}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <PenLine size={12} />
+                Cadastrar novo
+              </button>
+            </div>
+            <select
+              value={batchId}
+              onChange={(e) => setBatchId(e.target.value)}
+              required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Selecione o lote...</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.product.name} – Lote {b.batchNumber} {b.product.species ? `(${b.product.species})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Produto (novo)</label>
+                <button
+                  type="button"
+                  onClick={() => setManual(false)}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  Selecionar existente
+                </button>
+              </div>
+              <input
+                type="text"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                required
+                placeholder="Ex: CTM Alogênica Canina"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Lote (novo)</label>
+              <input
+                type="text"
+                value={batchNumber}
+                onChange={(e) => setBatchNumber(e.target.value)}
+                required
+                placeholder="Ex: 04.001.2026"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Palhetas</label>
@@ -148,7 +210,7 @@ export default function SupplyForm() {
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Observação (opcional)</label>
           <input
             type="text"
