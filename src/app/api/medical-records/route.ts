@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const {
-    patientName, patientSpecies, unitId, pathology, cellQuantity, applicationRoute,
+    patientName, patientSpecies, patientBreed, patientWeight,
+    ownerName, veterinarian, clinic,
+    unitId, pathology, cellQuantity, applicationRoute,
     donors, serumCollected, applications, thawings,
   } = body;
 
@@ -53,7 +55,11 @@ export async function POST(request: NextRequest) {
     data: {
       name: patientName,
       species: patientSpecies,
-      ownerName: "",
+      breed: patientBreed || null,
+      weight: patientWeight || null,
+      ownerName: ownerName || "",
+      veterinarian: veterinarian || null,
+      clinic: clinic || null,
       unitId,
     },
   });

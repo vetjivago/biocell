@@ -12,7 +12,9 @@ export default function NovoProntuarioPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    patientName: "", patientSpecies: "", unitId: "",
+    patientName: "", patientSpecies: "", patientBreed: "",
+    patientWeight: "", ownerName: "", veterinarian: "", clinic: "",
+    unitId: "",
     pathology: "", cellQuantity: "", applicationRoute: "",
     donors: "", serumCollected: false,
   });
@@ -45,6 +47,7 @@ export default function NovoProntuarioPage() {
 
     const payload = {
       ...form,
+      patientWeight: form.patientWeight ? parseFloat(form.patientWeight) : null,
       applications: applications.filter((a) => a.date || a.cells),
       thawings: thawings
         .filter((t) => t.thawedStraws || t.retrievalLocation)
@@ -99,6 +102,37 @@ export default function NovoProntuarioPage() {
                 <option value="Felino">Felino</option>
                 <option value="Equino">Equino</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Raça</label>
+              <input value={form.patientBreed} onChange={(e) => update("patientBreed", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Ex: Golden Retriever" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
+              <input type="number" step="0.1" min="0" value={form.patientWeight}
+                onChange={(e) => update("patientWeight", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Ex: 12.5" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Responsável (Tutor) *</label>
+              <input required value={form.ownerName} onChange={(e) => update("ownerName", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Nome do tutor" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Veterinário</label>
+              <input value={form.veterinarian} onChange={(e) => update("veterinarian", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Nome do veterinário" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Clínica</label>
+              <input value={form.clinic} onChange={(e) => update("clinic", e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Nome da clínica" />
             </div>
           </div>
         </div>
