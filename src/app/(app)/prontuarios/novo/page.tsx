@@ -11,6 +11,7 @@ export default function NovoProntuarioPage() {
   const router = useRouter();
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     patientName: "", patientSpecies: "", patientBreed: "",
     patientWeight: "", ownerName: "", veterinarian: "", clinic: "",
@@ -63,6 +64,9 @@ export default function NovoProntuarioPage() {
     if (res.ok) {
       const record = await res.json();
       router.push(`/prontuarios/${record.id}`);
+    } else {
+      const data = await res.json().catch(() => ({ error: "Erro ao registrar" }));
+      setError(data.error || "Erro ao registrar prontuário");
     }
     setLoading(false);
   }
@@ -239,6 +243,10 @@ export default function NovoProntuarioPage() {
             </div>
           ))}
         </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+        )}
 
         <button type="submit" disabled={loading}
           className="w-full bg-primary hover:bg-primary-light text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 text-lg">

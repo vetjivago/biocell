@@ -51,59 +51,87 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 
-  const patient = await prisma.patient.create({
-    data: {
-      name: patientName,
-      species: patientSpecies,
-      breed: patientBreed || null,
-      weight: patientWeight || null,
-      ownerName: ownerName || "",
-      veterinarian: veterinarian || null,
-      clinic: clinic || null,
-      unitId,
-    },
-  });
+  const validApps = (applications || []).filter(
+    (a: { date?: string; cells?: string }) => a.date || a.cells
+  );
+  const validThawings = (thawings || []).filter(
+    (t: { thawedStraws?: number | string; retrievalLocation?: string }) =>
+      (t.thawedStraws && Number(t.thawedStraws) > 0) || t.retrievalLocation
+  );
 
-  const record = await prisma.medicalRecord.create({
-    data: {
-      patientId: patient.id,
-      unitId,
-      professionalId: session.id,
-      pathology,
-      cellQuantity,
-      applicationRoute,
-      donors,
-      serumCollected: serumCollected || false,
-      applications: applications?.length ? {
-        createMany: {
-          data: applications.map((a: { number: number; date?: string; cells?: string; serum?: string; medium?: string }) => ({
-            number: a.number,
-            date: a.date ? new Date(a.date) : null,
-            cells: a.cells,
-            serum: a.serum,
-            medium: a.medium,
-          })),
+  try {
+    const record = await prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.create({
+        data: {
+          name: patientName,
+          species: patientSpecies,
+          breed: patientBreed || null,
+          weight: patientWeight || null,
+          ownerName: ownerName || "",
+          veterinarian: veterinarian || null,
+          clinic: clinic || null,
+          unitId,
         },
-      } : undefined,
-      thawings: thawings?.length ? {
-        createMany: {
-          data: thawings.map((t: { number: number; thawedStraws?: number; retrievalLocation?: string }) => ({
-            number: t.number,
-            thawedStraws: t.thawedStraws,
-            retrievalLocation: t.retrievalLocation,
-          })),
+      });
+
+      const mr = await tx.medicalRecord.create({
+        data: {
+          patientId: patient.id,
+          unitId,
+          professionalId: session.id,
+          pathology,
+          cellQuantity: cellQuantity || null,
+          applicationRoute: applicationRoute || null,
+          donors: donors || null,
+          serumCollected: serumCollected || false,
+          ...(validApps.length > 0
+            ? {
+                applications: {
+                  createMany: {
+                    data: validApps.map((a: { number: number; date?: string; cells?: string; serum?: string; medium?: string }) => ({
+                      number: a.number,
+                      date: a.date ? new Date(a.date) : null,
+                      cells: a.cells || null,
+                      serum: a.serum || null,
+                      medium: a.medium || null,
+                    })),
+                  },
+                },
+              }
+            : {}),
+          ...(validThawings.length > 0
+            ? {
+                thawings: {
+                  createMany: {
+                    data: validThawings.map((t: { number: number; thawedStraws?: number | string; retrievalLocation?: string }) => ({
+                      number: t.number,
+                      thawedStraws: t.thawedStraws ? Number(t.thawedStraws) : null,
+                      retrievalLocation: t.retrievalLocation || null,
+                    })),
+                  },
+                },
+              }
+            : {}),
         },
-      } : undefined,
-    },
-    include: { patient: true },
-  });
+        include: { patient: true },
+      });
 
-  await prisma.auditLog.create({
-    data: {
-      userId: session.id, action: "CREATE", entity: "MedicalRecord",
-      entityId: record.id, details: JSON.stringify({ patientName: patient.name, pathology }),
-    },
-  });
+      await tx.auditLog.create({
+        data: {
+          userId: session.id,
+          action: "CREATE",
+          entity: "MedicalRecord",
+          entityId: mr.id,
+          details: JSON.stringify({ patientName: patient.name, pathology }),
+        },
+      });
 
-  return Response.json(record, { status: 201 });
+      return mr;
+    });
+
+    return Response.json(record, { status: 201 });
+  } catch (err) {
+    console.error("Erro ao criar prontuário:", err);
+    return Response.json({ error: "Erro ao registrar prontuário" }, { status: 500 });
+  }
 }
