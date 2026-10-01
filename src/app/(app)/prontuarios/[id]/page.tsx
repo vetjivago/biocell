@@ -136,7 +136,7 @@ export default async function ProntuarioDetailPage({
 
       {/* Botão de Concluir */}
       {record.status === "OPEN" && (
-        <CompleteButton recordId={record.id} unitId={record.unitId} />
+        <CompleteButton recordId={record.id} unitId={record.unitId} cellQuantity={record.cellQuantity} />
       )}
     </div>
   );
