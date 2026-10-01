@@ -69,19 +69,27 @@ export async function POST(
     }),
   ]);
 
-  // Check stock threshold
-  const newBalance = currentBalance - strawsUsed;
-  const thresholds = await prisma.stockThreshold.findMany({
+  // Check stock threshold based on total unit balance
+  const allUnitTransactions = await prisma.inventoryTransaction.aggregate({
+    where: { unitId: record.unitId },
+    _sum: { quantity: true },
+  });
+  const totalUnitBalance = allUnitTransactions._sum.quantity || 0;
+
+  const threshold = await prisma.stockThreshold.findFirst({
     where: { unitId: record.unitId },
   });
 
-  for (const threshold of thresholds) {
-    if (newBalance <= threshold.minimumStraws) {
+  if (threshold && totalUnitBalance <= threshold.minimumStraws) {
+    const existingAlert = await prisma.alert.findFirst({
+      where: { unitId: record.unitId, type: "LOW_STOCK", resolved: false },
+    });
+    if (!existingAlert) {
       await prisma.alert.create({
         data: {
           unitId: record.unitId,
           type: "LOW_STOCK",
-          message: `Estoque baixo: ${newBalance} palhetas restantes (mínimo: ${threshold.minimumStraws})`,
+          message: `Estoque baixo: ${totalUnitBalance} palhetas restantes (mínimo: ${threshold.minimumStraws})`,
         },
       });
     }
