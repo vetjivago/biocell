@@ -84,15 +84,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500 font-medium mb-2">Usuários demo:</p>
-          <div className="space-y-1 text-xs text-gray-600">
-            <p><strong>Matriz:</strong> admin@biocell.com</p>
-            <p><strong>Profissional:</strong> joao@clinilab.com</p>
-            <p><strong>Gestor:</strong> maria@clinilab.com</p>
-            <p className="text-gray-400">Senha: biocell123</p>
-          </div>
-        </div>
       </div>
     </div>
   );

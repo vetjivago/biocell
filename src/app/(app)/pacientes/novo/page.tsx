@@ -9,6 +9,7 @@ export default function NovoPacientePage() {
   const router = useRouter();
   const [units, setUnits] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "", species: "Cão", breed: "", weight: "",
     ownerName: "", ownerPhone: "", ownerEmail: "",
@@ -33,6 +34,9 @@ export default function NovoPacientePage() {
     if (res.ok) {
       const patient = await res.json();
       router.push(`/pacientes/${patient.id}`);
+    } else {
+      const data = await res.json().catch(() => ({ error: "Erro ao cadastrar" }));
+      setError(data.error || "Erro ao cadastrar paciente");
     }
     setLoading(false);
   }
@@ -114,6 +118,10 @@ export default function NovoPacientePage() {
             {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+        )}
 
         <button type="submit" disabled={loading}
           className="w-full bg-primary hover:bg-primary-light text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50">

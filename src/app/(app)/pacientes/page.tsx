@@ -15,7 +15,7 @@ export default async function PacientesPage({
   const isAdmin = session.role === "ADMIN";
   const where = {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
-    ...(q ? { name: { contains: q } } : {}),
+    ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
   };
 
   const patients = await prisma.patient.findMany({

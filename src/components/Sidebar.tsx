@@ -18,8 +18,8 @@ import { useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
-  { href: "/prontuarios", label: "Prontuários", icon: ClipboardList, roles: null },
-  { href: "/pacientes", label: "Pacientes", icon: Users, roles: null },
+  { href: "/prontuarios", label: "Prontuários", icon: ClipboardList, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
+  { href: "/pacientes", label: "Pacientes", icon: Users, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "UNIT_MANAGER"] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "UNIT_MANAGER"] },

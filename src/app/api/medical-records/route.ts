@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     donors, serumCollected, applications, thawings,
   } = body;
 
-  if (!patientName || !patientSpecies || !unitId || !pathology) {
-    return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
+  if (!patientName || !patientSpecies || !unitId || !pathology || !ownerName) {
+    return Response.json({ error: "Campos obrigatórios faltando (nome, espécie, unidade, patologia e responsável)" }, { status: 400 });
   }
 
   if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
