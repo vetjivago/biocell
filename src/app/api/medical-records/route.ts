@@ -37,14 +37,19 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const {
+    patientId: existingPatientId,
     patientName, patientSpecies, patientBreed, patientWeight,
     ownerName, veterinarian, clinic,
     unitId, pathology, cellQuantity, applicationRoute,
     donors, serumCollected, applications, thawings,
   } = body;
 
-  if (!patientName || !patientSpecies || !unitId || !pathology || !ownerName) {
-    return Response.json({ error: "Campos obrigatórios faltando (nome, espécie, unidade, patologia e responsável)" }, { status: 400 });
+  if (!unitId || !pathology) {
+    return Response.json({ error: "Campos obrigatórios faltando (unidade e patologia)" }, { status: 400 });
+  }
+
+  if (!existingPatientId && (!patientName || !patientSpecies || !ownerName)) {
+    return Response.json({ error: "Campos obrigatórios faltando (nome, espécie e responsável)" }, { status: 400 });
   }
 
   if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
@@ -61,22 +66,27 @@ export async function POST(request: NextRequest) {
 
   try {
     const record = await prisma.$transaction(async (tx) => {
-      const patient = await tx.patient.create({
-        data: {
-          name: patientName,
-          species: patientSpecies,
-          breed: patientBreed || null,
-          weight: patientWeight || null,
-          ownerName: ownerName || "",
-          veterinarian: veterinarian || null,
-          clinic: clinic || null,
-          unitId,
-        },
-      });
+      let resolvedPatientId = existingPatientId;
+
+      if (!resolvedPatientId) {
+        const patient = await tx.patient.create({
+          data: {
+            name: patientName,
+            species: patientSpecies,
+            breed: patientBreed || null,
+            weight: patientWeight || null,
+            ownerName: ownerName || "",
+            veterinarian: veterinarian || null,
+            clinic: clinic || null,
+            unitId,
+          },
+        });
+        resolvedPatientId = patient.id;
+      }
 
       const mr = await tx.medicalRecord.create({
         data: {
-          patientId: patient.id,
+          patientId: resolvedPatientId,
           unitId,
           professionalId: session.id,
           pathology,
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
           action: "CREATE",
           entity: "MedicalRecord",
           entityId: mr.id,
-          details: JSON.stringify({ patientName: patient.name, pathology }),
+          details: JSON.stringify({ patientName: patientName || "paciente existente", pathology }),
         },
       });
 

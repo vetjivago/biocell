@@ -42,7 +42,7 @@ export default async function PacienteDetailPage({
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="flex items-start justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-900">{patient.name}</h1>
-          <Link href="/prontuarios/novo" className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-3 py-2 rounded-lg text-sm font-medium">
+          <Link href={`/prontuarios/novo?patientId=${patient.id}`} className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-3 py-2 rounded-lg text-sm font-medium">
             <Plus size={14} /> Novo Prontuário
           </Link>
         </div>
