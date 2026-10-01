@@ -107,5 +107,23 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  // Auto-resolve LOW_STOCK alerts if total unit balance is above threshold (default: 15)
+  if (type === "SUPPLY" || type === "TRANSFER_IN") {
+    const totalUnit = await prisma.inventoryTransaction.aggregate({
+      where: { unitId },
+      _sum: { quantity: true },
+    });
+    const totalBalance = totalUnit._sum.quantity || 0;
+    const threshold = await prisma.stockThreshold.findFirst({ where: { unitId } });
+    const minStraws = threshold?.minimumStraws ?? 15;
+
+    if (totalBalance > minStraws) {
+      await prisma.alert.updateMany({
+        where: { unitId, type: "LOW_STOCK", resolved: false },
+        data: { resolved: true },
+      });
+    }
+  }
+
   return Response.json(transaction, { status: 201 });
 }

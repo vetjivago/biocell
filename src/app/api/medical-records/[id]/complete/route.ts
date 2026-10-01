@@ -69,7 +69,7 @@ export async function POST(
     }),
   ]);
 
-  // Check stock threshold based on total unit balance
+  // Check stock threshold based on total unit balance (default: 15)
   const allUnitTransactions = await prisma.inventoryTransaction.aggregate({
     where: { unitId: record.unitId },
     _sum: { quantity: true },
@@ -79,8 +79,9 @@ export async function POST(
   const threshold = await prisma.stockThreshold.findFirst({
     where: { unitId: record.unitId },
   });
+  const minStraws = threshold?.minimumStraws ?? 15;
 
-  if (threshold && totalUnitBalance <= threshold.minimumStraws) {
+  if (totalUnitBalance <= minStraws) {
     const existingAlert = await prisma.alert.findFirst({
       where: { unitId: record.unitId, type: "LOW_STOCK", resolved: false },
     });
@@ -89,7 +90,7 @@ export async function POST(
         data: {
           unitId: record.unitId,
           type: "LOW_STOCK",
-          message: `Estoque baixo: ${totalUnitBalance} palhetas restantes (mínimo: ${threshold.minimumStraws})`,
+          message: `Estoque baixo: ${totalUnitBalance} palhetas restantes (mínimo: ${minStraws})`,
         },
       });
     }
