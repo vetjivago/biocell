@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const [batches, units] = await Promise.all([
     prisma.cellBatch.findMany({
       where: { id: { in: batchIds } },
-      include: { product: { select: { name: true, code: true, species: true } } },
+      include: { product: { select: { name: true, code: true, species: true, category: true } } },
     }),
     prisma.unit.findMany({
       where: { id: { in: unitIds } },
@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         batchNumber: batch?.batchNumber,
         productName: batch?.product.name,
         productCode: batch?.product.code,
+        category: batch?.product.category || "CELULAS",
         species: batch?.product.species,
         expirationDate: batch?.expirationDate,
         balance: g._sum.quantity || 0,

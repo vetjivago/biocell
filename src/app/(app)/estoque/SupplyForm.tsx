@@ -28,6 +28,7 @@ export default function SupplyForm() {
   const [unitId, setUnitId] = useState(preselectedUnitId);
   const [batchId, setBatchId] = useState("");
   const [productName, setProductName] = useState("");
+  const [productCategory, setProductCategory] = useState("CELULAS");
   const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
@@ -65,6 +66,7 @@ export default function SupplyForm() {
 
     if (manual) {
       payload.productName = productName;
+      payload.productCategory = productCategory;
       payload.batchNumber = batchNumber;
     } else {
       payload.batchId = batchId;
@@ -184,6 +186,18 @@ export default function SupplyForm() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+              <select
+                value={productCategory}
+                onChange={(e) => setProductCategory(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="CELULAS">Células-Tronco</option>
+                <option value="MEIO">Meio de Preparo</option>
+                <option value="SORO">Soro</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Lote (novo)</label>
               <input
                 type="text"
@@ -198,7 +212,7 @@ export default function SupplyForm() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Palhetas</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
           <input
             type="number"
             min="1"

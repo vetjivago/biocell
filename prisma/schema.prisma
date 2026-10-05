@@ -180,6 +180,7 @@ model CellProduct {
   code        String?
   description String?
   species     String?
+  category    String      @default("CELULAS")
   active      Boolean     @default(true)
   createdAt   DateTime    @default(now())
 

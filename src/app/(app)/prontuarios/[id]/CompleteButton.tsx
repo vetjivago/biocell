@@ -8,8 +8,20 @@ interface StockItem {
   batchId: string;
   batchNumber: string;
   productName: string;
+  category: string;
   balance: number;
 }
+
+interface CategoryItem {
+  batchId: string;
+  quantity: string;
+}
+
+const CATEGORIES = [
+  { key: "CELULAS", label: "Células-Tronco", unit: "palhetas", required: true },
+  { key: "MEIO", label: "Meio de Preparo", unit: "unidades", required: false },
+  { key: "SORO", label: "Soro", unit: "unidades", required: false },
+];
 
 function parseQuantity(cellQuantity: string | null): string {
   if (!cellQuantity) return "";
@@ -29,8 +41,11 @@ export default function CompleteButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [stock, setStock] = useState<StockItem[]>([]);
-  const [batchId, setBatchId] = useState("");
-  const [strawsUsed, setStrawsUsed] = useState("");
+  const [items, setItems] = useState<Record<string, CategoryItem>>({
+    CELULAS: { batchId: "", quantity: "" },
+    MEIO: { batchId: "", quantity: "" },
+    SORO: { batchId: "", quantity: "" },
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,21 +55,49 @@ export default function CompleteButton({
         .then((r) => r.json())
         .then((data: StockItem[]) => {
           setStock(data);
-          if (data.length === 1) setBatchId(data[0].batchId);
-          setStrawsUsed(parseQuantity(cellQuantity));
+          const celulas = data.filter((s) => s.category === "CELULAS");
+          const meio = data.filter((s) => s.category === "MEIO");
+          const soro = data.filter((s) => s.category === "SORO");
+          setItems({
+            CELULAS: {
+              batchId: celulas.length === 1 ? celulas[0].batchId : "",
+              quantity: parseQuantity(cellQuantity),
+            },
+            MEIO: {
+              batchId: meio.length === 1 ? meio[0].batchId : "",
+              quantity: "",
+            },
+            SORO: {
+              batchId: soro.length === 1 ? soro[0].batchId : "",
+              quantity: "",
+            },
+          });
         });
     }
   }, [open, unitId, cellQuantity]);
 
+  function updateItem(cat: string, field: "batchId" | "quantity", value: string) {
+    setItems((prev) => ({ ...prev, [cat]: { ...prev[cat], [field]: value } }));
+  }
+
   async function handleComplete() {
-    if (!batchId || !strawsUsed) return;
+    const celulas = items.CELULAS;
+    if (!celulas.batchId || !celulas.quantity) return;
     setLoading(true);
     setError("");
+
+    const consumptionItems = CATEGORIES
+      .filter((c) => items[c.key].batchId && items[c.key].quantity && parseInt(items[c.key].quantity) > 0)
+      .map((c) => ({
+        batchId: items[c.key].batchId,
+        quantity: parseInt(items[c.key].quantity),
+        category: c.key,
+      }));
 
     const res = await fetch(`/api/medical-records/${recordId}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batchId, strawsUsed: parseInt(strawsUsed) }),
+      body: JSON.stringify({ items: consumptionItems }),
     });
 
     if (res.ok) {
@@ -66,8 +109,6 @@ export default function CompleteButton({
     }
     setLoading(false);
   }
-
-  const selected = stock.find((s) => s.batchId === batchId);
 
   if (!open) {
     return (
@@ -81,66 +122,87 @@ export default function CompleteButton({
     );
   }
 
+  const celulasValid = items.CELULAS.batchId && items.CELULAS.quantity;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border-2 border-primary p-6">
       <h2 className="font-semibold text-gray-900 mb-2">Confirmar Baixa no Estoque</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Confira os dados abaixo e confirme para concluir o atendimento.
+        Preencha a quantidade utilizada de cada item. Células-Tronco é obrigatório.
       </p>
 
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{error}</div>}
 
-      {stock.length === 0 && (
-        <div className="bg-amber-50 text-amber-700 px-4 py-3 rounded-lg text-sm mb-4">
-          Nenhum lote com estoque disponível nesta unidade. Solicite abastecimento à matriz.
-        </div>
-      )}
+      <div className="space-y-4 mb-4">
+        {CATEGORIES.map((cat) => {
+          const catStock = stock.filter((s) => s.category === cat.key);
+          const item = items[cat.key];
+          const selected = catStock.find((s) => s.batchId === item.batchId);
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Lote *</label>
-          {stock.length === 1 ? (
-            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800">
-              {stock[0].productName} – Lote {stock[0].batchNumber} ({stock[0].balance} disponíveis)
+          if (catStock.length === 0 && !cat.required) return null;
+
+          return (
+            <div key={cat.key} className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-800 mb-2">
+                {cat.label} {cat.required ? "*" : "(opcional)"}
+              </p>
+
+              {catStock.length === 0 ? (
+                <p className="text-xs text-amber-600">
+                  Nenhum lote de {cat.label.toLowerCase()} disponível.{" "}
+                  {cat.required ? "Solicite abastecimento à matriz." : ""}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Lote</label>
+                    {catStock.length === 1 ? (
+                      <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-800">
+                        {catStock[0].productName} – {catStock[0].batchNumber} ({catStock[0].balance} disp.)
+                      </div>
+                    ) : (
+                      <select value={item.batchId} onChange={(e) => updateItem(cat.key, "batchId", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">Selecione...</option>
+                        {catStock.map((s) => (
+                          <option key={s.batchId} value={s.batchId}>
+                            {s.productName} – {s.batchNumber} ({s.balance} disp.)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Quantidade ({cat.unit})</label>
+                    <input
+                      type="number" min="1" max={selected?.balance || 999} value={item.quantity}
+                      onChange={(e) => updateItem(cat.key, "quantity", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Qtd"
+                    />
+                    {cat.key === "CELULAS" && cellQuantity && (
+                      <p className="text-xs text-gray-400 mt-1">Prontuário: {cellQuantity}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selected && item.quantity && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Saldo: {selected.balance} → {selected.balance - (parseInt(item.quantity) || 0)} {cat.unit}
+                </p>
+              )}
             </div>
-          ) : (
-            <select value={batchId} onChange={(e) => setBatchId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-              <option value="">Selecione o lote...</option>
-              {stock.map((s) => (
-                <option key={s.batchId} value={s.batchId}>
-                  {s.productName} – Lote {s.batchNumber} ({s.balance} disponíveis)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Palhetas Utilizadas *</label>
-          <input
-            type="number" min="1" max={selected?.balance || 999} value={strawsUsed}
-            onChange={(e) => setStrawsUsed(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            placeholder="Quantidade"
-          />
-          {cellQuantity && (
-            <p className="text-xs text-gray-400 mt-1">Prontuário indica: {cellQuantity}</p>
-          )}
-        </div>
+          );
+        })}
       </div>
-
-      {selected && (
-        <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm text-gray-600">
-          Saldo atual: <strong>{selected.balance}</strong> palhetas → Após baixa: <strong>{selected.balance - (parseInt(strawsUsed) || 0)}</strong> palhetas
-        </div>
-      )}
 
       <div className="flex gap-3">
         <button onClick={() => setOpen(false)}
           className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
           Cancelar
         </button>
-        <button onClick={handleComplete} disabled={loading || !batchId || !strawsUsed || stock.length === 0}
+        <button onClick={handleComplete} disabled={loading || !celulasValid}
           className="flex-1 bg-primary hover:bg-primary-light text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50">
           {loading ? "Processando..." : "Confirmar Baixa"}
         </button>

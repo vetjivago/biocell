@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { unitId, batchId, batchNumber, productName, type, quantity, reason } = body;
+  const { unitId, batchId, batchNumber, productName, productCategory, type, quantity, reason } = body;
 
   if (!unitId || !type || !quantity) {
     return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     });
     if (!product) {
       product = await prisma.cellProduct.create({
-        data: { name: productName },
+        data: { name: productName, category: productCategory || "CELULAS" },
       });
     }
 
@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
   });
 
   // Auto-resolve LOW_STOCK alerts if total unit balance is above threshold (default: 15)
-  if (type === "SUPPLY" || type === "TRANSFER_IN") {
+  if (type === "SUPPLY" || type === "TRANSFER_IN" || type === "RECEIPT") {
     const totalUnit = await prisma.inventoryTransaction.aggregate({
-      where: { unitId },
+      where: { unitId, batch: { product: { category: "CELULAS" } } },
       _sum: { quantity: true },
     });
     const totalBalance = totalUnit._sum.quantity || 0;
