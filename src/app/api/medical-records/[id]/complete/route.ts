@@ -60,15 +60,9 @@ export async function POST(
     }
   }
 
-  // Build transaction operations
-  const operations = [
-    prisma.medicalRecord.update({
-      where: { id },
-      data: { status: "COMPLETED", completedAt: new Date() },
-    }),
-  ];
-
+  // Prepare balance details for audit
   const balanceDetails: { batchId: string; quantity: number; newBalance: number; category: string }[] = [];
+  const inventoryOps: { batchId: string; quantity: number; newBalance: number; categoryLabel: string }[] = [];
 
   for (const item of consumptionItems) {
     const transactions = await prisma.inventoryTransaction.findMany({
@@ -76,29 +70,34 @@ export async function POST(
     });
     const currentBalance = transactions.reduce((sum, t) => sum + t.quantity, 0);
     const newBalance = currentBalance - item.quantity;
-
     const categoryLabel = item.category === "MEIO" ? "meio" : item.category === "SORO" ? "soro" : "células";
 
-    operations.push(
-      prisma.inventoryTransaction.create({
-        data: {
-          unitId: record.unitId,
-          batchId: item.batchId,
-          type: "CONSUMPTION",
-          quantity: -item.quantity,
-          balance: newBalance,
-          medicalRecordId: id,
-          reason: `Consumo ${categoryLabel} – ${record.patient.name} – ${record.pathology}`,
-          performedBy: session.name,
-        },
-      })
-    );
-
+    inventoryOps.push({ batchId: item.batchId, quantity: item.quantity, newBalance, categoryLabel });
     balanceDetails.push({ batchId: item.batchId, quantity: item.quantity, newBalance, category: item.category });
   }
 
-  operations.push(
-    prisma.auditLog.create({
+  const updatedRecord = await prisma.$transaction(async (tx) => {
+    const updated = await tx.medicalRecord.update({
+      where: { id },
+      data: { status: "COMPLETED", completedAt: new Date() },
+    });
+
+    for (const op of inventoryOps) {
+      await tx.inventoryTransaction.create({
+        data: {
+          unitId: record.unitId,
+          batchId: op.batchId,
+          type: "CONSUMPTION",
+          quantity: -op.quantity,
+          balance: op.newBalance,
+          medicalRecordId: id,
+          reason: `Consumo ${op.categoryLabel} – ${record.patient.name} – ${record.pathology}`,
+          performedBy: session.name,
+        },
+      });
+    }
+
+    await tx.auditLog.create({
       data: {
         userId: session.id,
         action: "CONSUMPTION",
@@ -106,10 +105,10 @@ export async function POST(
         entityId: id,
         details: JSON.stringify(balanceDetails),
       },
-    })
-  );
+    });
 
-  const [updatedRecord] = await prisma.$transaction(operations);
+    return updated;
+  });
 
   // Check stock threshold for cells only (default: 15)
   const cellBatchIds = consumptionItems.filter((i) => i.category === "CELULAS").map((i) => i.batchId);
