@@ -105,9 +105,11 @@ export default async function ProntuarioDetailPage({
           <h2 className="font-semibold text-gray-900 mb-3">Descongelamento</h2>
           <div className="space-y-2">
             {record.thawings.map((t) => (
-              <div key={t.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg text-sm">
+              <div key={t.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg text-sm flex-wrap">
                 <span className="font-medium text-gray-700">{t.number}º</span>
                 <span className="text-gray-600">Palhetas: {t.thawedStraws || "–"}</span>
+                <span className="text-gray-600">Meio: {t.thawedMeio || "–"}</span>
+                <span className="text-gray-600">Soro: {t.thawedSoro || "–"}</span>
                 <span className="text-gray-600">Local: {t.retrievalLocation || "–"}</span>
               </div>
             ))}
@@ -123,7 +125,7 @@ export default async function ProntuarioDetailPage({
             {record.inventoryTransactions.map((t) => (
               <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm">
                 <div>
-                  <span className="font-medium text-red-600">{t.quantity} palhetas</span>
+                  <span className="font-medium text-red-600">{t.quantity} un.</span>
                   <span className="text-gray-500 ml-2">{t.batch.product.name}</span>
                   <span className="text-gray-400 ml-2">Lote: {t.batch.batchNumber}</span>
                 </div>
@@ -136,7 +138,13 @@ export default async function ProntuarioDetailPage({
 
       {/* Botão de Concluir */}
       {record.status === "OPEN" && (
-        <CompleteButton recordId={record.id} unitId={record.unitId} cellQuantity={record.cellQuantity} />
+        <CompleteButton
+          recordId={record.id}
+          unitId={record.unitId}
+          cellQuantity={record.cellQuantity}
+          meioQuantity={record.thawings.reduce((sum, t) => sum + (t.thawedMeio || 0), 0) || null}
+          soroQuantity={record.thawings.reduce((sum, t) => sum + (t.thawedSoro || 0), 0) || null}
+        />
       )}
     </div>
   );

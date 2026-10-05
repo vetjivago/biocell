@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     (a: { date?: string; cells?: string }) => a.date || a.cells
   );
   const validThawings = (thawings || []).filter(
-    (t: { thawedStraws?: number | string; retrievalLocation?: string }) =>
-      (t.thawedStraws && Number(t.thawedStraws) > 0) || t.retrievalLocation
+    (t: { thawedStraws?: number | string; thawedMeio?: number | string; thawedSoro?: number | string; retrievalLocation?: string }) =>
+      (t.thawedStraws && Number(t.thawedStraws) > 0) || (t.thawedMeio && Number(t.thawedMeio) > 0) || (t.thawedSoro && Number(t.thawedSoro) > 0) || t.retrievalLocation
   );
 
   try {
@@ -113,9 +113,11 @@ export async function POST(request: NextRequest) {
             ? {
                 thawings: {
                   createMany: {
-                    data: validThawings.map((t: { number: number; thawedStraws?: number | string; retrievalLocation?: string }) => ({
+                    data: validThawings.map((t: { number: number; thawedStraws?: number | string; thawedMeio?: number | string; thawedSoro?: number | string; retrievalLocation?: string }) => ({
                       number: t.number,
                       thawedStraws: t.thawedStraws ? Number(t.thawedStraws) : null,
+                      thawedMeio: t.thawedMeio ? Number(t.thawedMeio) : null,
+                      thawedSoro: t.thawedSoro ? Number(t.thawedSoro) : null,
                       retrievalLocation: t.retrievalLocation || null,
                     })),
                   },

@@ -7,7 +7,7 @@ import Link from "next/link";
 
 interface Unit { id: string; name: string; }
 interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; readonly?: boolean; }
-interface ThawEntry { number: number; thawedStraws: string; retrievalLocation: string; readonly?: boolean; }
+interface ThawEntry { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string; readonly?: boolean; }
 
 function NovoProntuarioForm() {
   const router = useRouter();
@@ -30,7 +30,7 @@ function NovoProntuarioForm() {
     { number: 1, date: "", cells: "", serum: "", medium: "" },
   ]);
   const [thawings, setThawings] = useState<ThawEntry[]>([
-    { number: 1, thawedStraws: "", retrievalLocation: "" },
+    { number: 1, thawedStraws: "", thawedMeio: "", thawedSoro: "", retrievalLocation: "" },
   ]);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ function NovoProntuarioForm() {
         const nextThawNum = prevThaws.length > 0 ? Math.max(...prevThaws.map((t: ThawEntry) => t.number)) + 1 : 1;
         setThawings([
           ...prevThaws,
-          { number: nextThawNum, thawedStraws: "", retrievalLocation: "" },
+          { number: nextThawNum, thawedStraws: "", thawedMeio: "", thawedSoro: "", retrievalLocation: "" },
         ]);
 
         setLoadingPatient(false);
@@ -111,8 +111,13 @@ function NovoProntuarioForm() {
 
     const newApps = applications.filter((a) => !a.readonly && (a.date || a.cells));
     const newThaws = thawings
-      .filter((t) => !t.readonly && (t.thawedStraws || t.retrievalLocation))
-      .map((t) => ({ ...t, thawedStraws: t.thawedStraws ? parseInt(t.thawedStraws) : null }));
+      .filter((t) => !t.readonly && (t.thawedStraws || t.thawedMeio || t.thawedSoro || t.retrievalLocation))
+      .map((t) => ({
+        ...t,
+        thawedStraws: t.thawedStraws ? parseInt(t.thawedStraws) : null,
+        thawedMeio: t.thawedMeio ? parseInt(t.thawedMeio) : null,
+        thawedSoro: t.thawedSoro ? parseInt(t.thawedSoro) : null,
+      }));
 
     const payload = {
       ...form,
@@ -341,7 +346,7 @@ function NovoProntuarioForm() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Procedimento Inicial (Descongelamento)</h2>
             {thawings.length < 6 && (
-              <button type="button" onClick={() => setThawings((t) => [...t, { number: maxThawNum + 1, thawedStraws: "", retrievalLocation: "" }])}
+              <button type="button" onClick={() => setThawings((t) => [...t, { number: maxThawNum + 1, thawedStraws: "", thawedMeio: "", thawedSoro: "", retrievalLocation: "" }])}
                 className="text-sm text-primary hover:underline">+ Adicionar</button>
             )}
           </div>
@@ -351,9 +356,11 @@ function NovoProntuarioForm() {
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Descongelamentos anteriores</p>
               {readonlyThaws.map((thaw) => (
                 <div key={`prev-${thaw.number}`} className="mb-2 p-3 bg-gray-100 rounded-lg opacity-70">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
                     <span className="font-medium">{thaw.number}º</span>
                     <span>Palhetas: {thaw.thawedStraws || "–"}</span>
+                    <span>Meio: {thaw.thawedMeio || "–"}</span>
+                    <span>Soro: {thaw.thawedSoro || "–"}</span>
                     <span>Local: {thaw.retrievalLocation || "–"}</span>
                   </div>
                 </div>
@@ -369,17 +376,27 @@ function NovoProntuarioForm() {
             return (
               <div key={idx} className="mb-3 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-700 mb-2">{thaw.number}º Descongelamento</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Palhetas Descongeladas (qtd)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Palhetas (qtd)</label>
                     <input type="number" value={thaw.thawedStraws} onChange={(e) => updateThaw(idx, "thawedStraws", e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Local de Retirada (Caneca)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Meio (qtd)</label>
+                    <input type="number" value={thaw.thawedMeio} onChange={(e) => updateThaw(idx, "thawedMeio", e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Soro (qtd)</label>
+                    <input type="number" value={thaw.thawedSoro} onChange={(e) => updateThaw(idx, "thawedSoro", e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Local de Retirada</label>
                     <input value={thaw.retrievalLocation} onChange={(e) => updateThaw(idx, "retrievalLocation", e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                      placeholder="Ex: Caneca 2 – posição 5" />
+                      placeholder="Ex: Caneca 2" />
                   </div>
                 </div>
               </div>

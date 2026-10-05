@@ -154,6 +154,8 @@ model Thawing {
   medicalRecord     MedicalRecord @relation(fields: [medicalRecordId], references: [id])
   number            Int
   thawedStraws      Int?
+  thawedMeio        Int?
+  thawedSoro        Int?
   retrievalLocation String?
   notes             String?
 

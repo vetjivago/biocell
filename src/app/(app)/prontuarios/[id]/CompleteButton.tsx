@@ -33,10 +33,14 @@ export default function CompleteButton({
   recordId,
   unitId,
   cellQuantity,
+  meioQuantity,
+  soroQuantity,
 }: {
   recordId: string;
   unitId: string;
   cellQuantity: string | null;
+  meioQuantity?: number | null;
+  soroQuantity?: number | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -65,16 +69,16 @@ export default function CompleteButton({
             },
             MEIO: {
               batchId: meio.length === 1 ? meio[0].batchId : "",
-              quantity: "",
+              quantity: meioQuantity ? meioQuantity.toString() : "",
             },
             SORO: {
               batchId: soro.length === 1 ? soro[0].batchId : "",
-              quantity: "",
+              quantity: soroQuantity ? soroQuantity.toString() : "",
             },
           });
         });
     }
-  }, [open, unitId, cellQuantity]);
+  }, [open, unitId, cellQuantity, meioQuantity, soroQuantity]);
 
   function updateItem(cat: string, field: "batchId" | "quantity", value: string) {
     setItems((prev) => ({ ...prev, [cat]: { ...prev[cat], [field]: value } }));

@@ -43,6 +43,8 @@ export async function GET(
     r.thawings.map((t) => ({
       number: t.number,
       thawedStraws: t.thawedStraws?.toString() || "",
+      thawedMeio: t.thawedMeio?.toString() || "",
+      thawedSoro: t.thawedSoro?.toString() || "",
       retrievalLocation: t.retrievalLocation || "",
     }))
   );
