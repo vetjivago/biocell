@@ -19,8 +19,8 @@ interface CategoryItem {
 
 const CATEGORIES = [
   { key: "CELULAS", label: "Células-Tronco", unit: "palhetas", required: true },
-  { key: "MEIO", label: "Meio de Preparo", unit: "unidades", required: false },
-  { key: "SORO", label: "Soro", unit: "unidades", required: false },
+  { key: "MEIO", label: "Meio de Preparo", unit: "unidades", required: true },
+  { key: "SORO", label: "Soro", unit: "unidades", required: true },
 ];
 
 function parseQuantity(cellQuantity: string | null): string {
@@ -85,8 +85,12 @@ export default function CompleteButton({
   }
 
   async function handleComplete() {
-    const celulas = items.CELULAS;
-    if (!celulas.batchId || !celulas.quantity) return;
+    for (const cat of CATEGORIES) {
+      if (cat.required && (!items[cat.key].batchId || !items[cat.key].quantity)) {
+        setError(`Preencha lote e quantidade de ${cat.label}`);
+        return;
+      }
+    }
     setLoading(true);
     setError("");
 
@@ -126,13 +130,13 @@ export default function CompleteButton({
     );
   }
 
-  const celulasValid = items.CELULAS.batchId && items.CELULAS.quantity;
+  const allRequiredValid = CATEGORIES.every((c) => !c.required || (items[c.key].batchId && items[c.key].quantity));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border-2 border-primary p-6">
       <h2 className="font-semibold text-gray-900 mb-2">Confirmar Baixa no Estoque</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Preencha a quantidade utilizada de cada item. Células-Tronco é obrigatório.
+        Preencha a quantidade utilizada de cada item. Todos são obrigatórios.
       </p>
 
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{error}</div>}
@@ -206,7 +210,7 @@ export default function CompleteButton({
           className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
           Cancelar
         </button>
-        <button onClick={handleComplete} disabled={loading || !celulasValid}
+        <button onClick={handleComplete} disabled={loading || !allRequiredValid}
           className="flex-1 bg-primary hover:bg-primary-light text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50">
           {loading ? "Processando..." : "Confirmar Baixa"}
         </button>

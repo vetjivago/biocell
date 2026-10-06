@@ -20,13 +20,13 @@ export default async function EstoquePage() {
   const batchIds = [...new Set(grouped.map((g) => g.batchId))];
   const unitIds = [...new Set(grouped.map((g) => g.unitId))];
 
-  const [batches, units, thresholds, recentTransactions] = await Promise.all([
+  const [batches, units, activeAlerts, recentTransactions] = await Promise.all([
     prisma.cellBatch.findMany({
       where: { id: { in: batchIds } },
       include: { product: { select: { name: true, code: true, species: true, category: true } } },
     }),
     prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } }),
-    prisma.stockThreshold.findMany({ where: unitFilter }),
+    prisma.alert.count({ where: { ...unitFilter, resolved: false } }),
     prisma.inventoryTransaction.findMany({
       where: unitFilter,
       include: {
@@ -116,7 +116,7 @@ export default async function EstoquePage() {
             <AlertTriangle className="text-amber-500" size={24} />
             <div>
               <p className="text-sm text-gray-500">Alertas Ativos</p>
-              <p className="text-2xl font-bold">{thresholds.length}</p>
+              <p className="text-2xl font-bold">{activeAlerts}</p>
             </div>
           </div>
         </div>
