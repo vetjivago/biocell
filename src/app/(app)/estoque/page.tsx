@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { Package, AlertTriangle } from "lucide-react";
+import { Package, AlertTriangle, Beaker, Droplets } from "lucide-react";
 import SupplyForm from "./SupplyForm";
 
 export default async function EstoquePage() {
@@ -23,7 +23,7 @@ export default async function EstoquePage() {
   const [batches, units, thresholds, recentTransactions] = await Promise.all([
     prisma.cellBatch.findMany({
       where: { id: { in: batchIds } },
-      include: { product: { select: { name: true, code: true, species: true } } },
+      include: { product: { select: { name: true, code: true, species: true, category: true } } },
     }),
     prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true } }),
     prisma.stockThreshold.findMany({ where: unitFilter }),
@@ -49,6 +49,7 @@ export default async function EstoquePage() {
         unitName: unitMap[g.unitId] || "",
         batchNumber: batch?.batchNumber || "",
         productName: batch?.product.name || "",
+        category: batch?.product.category || "CELULAS",
         species: batch?.product.species || "",
         expirationDate: batch?.expirationDate,
         balance: g._sum.quantity || 0,
@@ -70,7 +71,7 @@ export default async function EstoquePage() {
     <div>
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Estoque de Células</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Estoque</h1>
           <p className="text-sm text-gray-500 mt-1">
             {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
           </p>
@@ -79,22 +80,34 @@ export default async function EstoquePage() {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
             <Package className="text-primary" size={24} />
             <div>
-              <p className="text-sm text-gray-500">Total de Palhetas</p>
-              <p className="text-2xl font-bold">{stock.reduce((s, i) => s + i.balance, 0)}</p>
+              <p className="text-sm text-gray-500">Células-Tronco</p>
+              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "CELULAS").reduce((sum, i) => sum + i.balance, 0)}</p>
+              <p className="text-xs text-gray-400">palhetas</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
-            <Package className="text-blue-500" size={24} />
+            <Beaker className="text-blue-500" size={24} />
             <div>
-              <p className="text-sm text-gray-500">Lotes Ativos</p>
-              <p className="text-2xl font-bold">{new Set(stock.map((s) => s.batchNumber)).size}</p>
+              <p className="text-sm text-gray-500">Meio de Preparo</p>
+              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "MEIO").reduce((sum, i) => sum + i.balance, 0)}</p>
+              <p className="text-xs text-gray-400">unidades</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3">
+            <Droplets className="text-purple-500" size={24} />
+            <div>
+              <p className="text-sm text-gray-500">Soro</p>
+              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "SORO").reduce((sum, i) => sum + i.balance, 0)}</p>
+              <p className="text-xs text-gray-400">unidades</p>
             </div>
           </div>
         </div>
@@ -118,6 +131,7 @@ export default async function EstoquePage() {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
+              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Categoria</th>
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto</th>
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Lote</th>
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Espécie</th>
@@ -129,6 +143,15 @@ export default async function EstoquePage() {
             {stock.map((s, i) => (
               <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.unitName}</td>
+                <td className="px-4 py-3 text-sm">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    s.category === "CELULAS" ? "bg-green-100 text-green-700" :
+                    s.category === "MEIO" ? "bg-blue-100 text-blue-700" :
+                    "bg-purple-100 text-purple-700"
+                  }`}>
+                    {s.category === "CELULAS" ? "Células" : s.category === "MEIO" ? "Meio" : "Soro"}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{s.productName}</td>
                 <td className="px-4 py-3 text-sm font-mono text-gray-600">{s.batchNumber}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{s.species}</td>
@@ -141,7 +164,7 @@ export default async function EstoquePage() {
               </tr>
             ))}
             {stock.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">Nenhum estoque registrado</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">Nenhum estoque registrado</td></tr>
             )}
           </tbody>
         </table>
