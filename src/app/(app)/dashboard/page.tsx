@@ -39,7 +39,7 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     prisma.inventoryTransaction.groupBy({
       by: ["unitId"],
       _sum: { quantity: true },
-      where: unitFilter,
+      where: { ...unitFilter, batch: { product: { category: "CELULAS" } } },
     }),
     prisma.medicalRecord.groupBy({
       by: ["pathology"],

@@ -9,6 +9,27 @@ interface Unit { id: string; name: string; }
 interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; readonly?: boolean; }
 interface ThawEntry { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string; readonly?: boolean; }
 
+const PATHOLOGIES = [
+  "Displasia coxofemoral",
+  "Doença renal crônica (DRC)",
+  "Doença articular degenerativa (DAD)",
+  "Artrose",
+  "Ruptura de ligamento cruzado cranial",
+  "Doença do disco intervertebral (DDIV)",
+  "Atopia / Dermatite atópica",
+  "Doença inflamatória intestinal (DII)",
+  "Insuficiência hepática crônica",
+  "Ceratoconjuntivite seca (KCS)",
+  "Fratura / Não-união óssea",
+  "Lesão de tendão / ligamento",
+  "Cinomose – sequela neurológica",
+  "Gengivite / Estomatite crônica felina",
+  "Fibrose pulmonar",
+  "Cardiopatia",
+  "Diabetes mellitus",
+  "Epilepsia idiopática",
+];
+
 function NovoProntuarioForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,6 +40,7 @@ function NovoProntuarioForm() {
   const [loadingPatient, setLoadingPatient] = useState(!!patientId);
   const [error, setError] = useState("");
   const [isExistingPatient, setIsExistingPatient] = useState(false);
+  const [isCustomPathology, setIsCustomPathology] = useState(false);
   const [form, setForm] = useState({
     patientName: "", patientSpecies: "", patientBreed: "",
     patientWeight: "", ownerName: "", veterinarian: "", clinic: "",
@@ -51,6 +73,9 @@ function NovoProntuarioForm() {
         setIsExistingPatient(true);
         const p = data.patient;
         const lr = data.lastRecord;
+        if (lr?.pathology && !PATHOLOGIES.includes(lr.pathology)) {
+          setIsCustomPathology(true);
+        }
         setForm({
           patientName: p.name,
           patientSpecies: p.species,
@@ -249,9 +274,35 @@ function NovoProntuarioForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Patologia *</label>
-              <input required value={form.pathology} onChange={(e) => update("pathology", e.target.value)}
+              <select
+                value={isCustomPathology ? "__OTHER__" : form.pathology}
+                onChange={(e) => {
+                  if (e.target.value === "__OTHER__") {
+                    setIsCustomPathology(true);
+                    update("pathology", "");
+                  } else {
+                    setIsCustomPathology(false);
+                    update("pathology", e.target.value);
+                  }
+                }}
+                required={!isCustomPathology}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                placeholder="Ex: Displasia coxofemoral bilateral" />
+              >
+                <option value="">Selecione a patologia...</option>
+                {PATHOLOGIES.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+                <option value="__OTHER__">Outra (especificar)</option>
+              </select>
+              {isCustomPathology && (
+                <input
+                  required
+                  value={form.pathology}
+                  onChange={(e) => update("pathology", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-2"
+                  placeholder="Descreva a patologia ou condição especial"
+                />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Células</label>
