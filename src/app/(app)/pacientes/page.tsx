@@ -2,19 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { Plus, Search, FilePlus } from "lucide-react";
-
-const SEARCH_FIELDS = {
-  all: { label: "Todos os campos", placeholder: "Buscar por animal, responsável, veterinário, clínica..." },
-  name: { label: "Animal", placeholder: "Buscar por nome do animal..." },
-  ownerName: { label: "Responsável", placeholder: "Buscar por nome do responsável (tutor)..." },
-  ownerPhone: { label: "Telefone", placeholder: "Buscar por telefone do responsável..." },
-  veterinarian: { label: "Veterinário", placeholder: "Buscar por veterinário..." },
-  clinic: { label: "Clínica", placeholder: "Buscar por clínica..." },
-  breed: { label: "Raça", placeholder: "Buscar por raça..." },
-} as const;
-
-type SearchField = keyof typeof SEARCH_FIELDS;
-const TEXT_FIELDS = ["name", "ownerName", "ownerPhone", "veterinarian", "clinic", "breed"] as const;
+import { SEARCH_FIELDS, parseSearchField, patientSearchWhere } from "@/lib/patient-search";
 
 export default async function PacientesPage({
   searchParams,
@@ -25,17 +13,8 @@ export default async function PacientesPage({
   if (!session) return null;
   const { q: rawQ, campo } = await searchParams;
   const q = rawQ?.trim();
-  const field: SearchField = campo && campo in SEARCH_FIELDS ? (campo as SearchField) : "all";
-
-  const isAdmin = session.role === "ADMIN";
-  const where = {
-    ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
-    ...(q
-      ? field === "all"
-        ? { OR: TEXT_FIELDS.map((f) => ({ [f]: { contains: q, mode: "insensitive" as const } })) }
-        : { [field]: { contains: q, mode: "insensitive" as const } }
-      : {}),
-  };
+  const field = parseSearchField(campo);
+  const where = patientSearchWhere(session, q, field);
 
   const patients = await prisma.patient.findMany({
     where,

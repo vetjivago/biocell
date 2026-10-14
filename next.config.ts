@@ -52,6 +52,18 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      // Só em desenvolvimento: permite testar a versão web do app mobile (Expo, porta 8081).
+      // Apps nativos (iOS/Android) não usam CORS.
+      ...(process.env.NODE_ENV === "development"
+        ? [{
+            source: "/api/:path*",
+            headers: [
+              { key: "Access-Control-Allow-Origin", value: "http://localhost:8081" },
+              { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
+              { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
+            ],
+          }]
+        : []),
     ];
   },
 };

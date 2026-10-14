@@ -1,6 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { parseSearchField, patientSearchWhere } from "@/lib/patient-search";
+
+export async function GET(request: NextRequest) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const where = patientSearchWhere(session, searchParams.get("q"), parseSearchField(searchParams.get("campo")));
+  const patients = await prisma.patient.findMany({
+    where,
+    include: { unit: { select: { name: true } }, _count: { select: { medicalRecords: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+  return Response.json(patients);
+}
 
 export async function POST(request: NextRequest) {
   const session = await getSession();

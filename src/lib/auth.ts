@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
@@ -16,11 +16,15 @@ export interface SessionUser {
   unitIds: string[];
 }
 
-export async function createSession(user: SessionUser) {
-  const token = await new SignJWT({ user })
+export async function signToken(user: SessionUser, expiresIn = "8h") {
+  return new SignJWT({ user })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("8h")
+    .setExpirationTime(expiresIn)
     .sign(SECRET);
+}
+
+export async function createSession(user: SessionUser) {
+  const token = await signToken(user);
 
   const cookieStore = await cookies();
   cookieStore.set("session", token, {
@@ -33,8 +37,11 @@ export async function createSession(user: SessionUser) {
 }
 
 export async function getSession(): Promise<SessionUser | null> {
+  // App mobile envia "Authorization: Bearer <token>"; o webapp usa o cookie
+  const authHeader = (await headers()).get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieStore = await cookies();
-  const token = cookieStore.get("session")?.value;
+  const token = bearer || cookieStore.get("session")?.value;
   if (!token) return null;
 
   try {
@@ -50,7 +57,7 @@ export async function destroySession() {
   cookieStore.delete("session");
 }
 
-export async function authenticate(email: string, password: string) {
+export async function authenticate(email: string, password: string, { setCookie = true } = {}) {
   const user = await prisma.user.findUnique({
     where: { email },
     include: { units: true },
@@ -70,6 +77,6 @@ export async function authenticate(email: string, password: string) {
     unitIds: user.units.map((u) => u.unitId),
   };
 
-  await createSession(sessionUser);
+  if (setCookie) await createSession(sessionUser);
   return sessionUser;
 }

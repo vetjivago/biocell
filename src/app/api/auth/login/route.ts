@@ -1,4 +1,4 @@
-import { authenticate } from "@/lib/auth";
+import { authenticate, signToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { NextRequest } from "next/server";
 
@@ -16,15 +16,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, password } = await request.json();
+  const { email, password, client } = await request.json();
+  const isMobile = client === "mobile";
 
   if (!email || !password) {
     return Response.json({ error: "Email e senha são obrigatórios" }, { status: 400 });
   }
 
-  const user = await authenticate(email, password);
+  const user = await authenticate(email, password, { setCookie: !isMobile });
   if (!user) {
     return Response.json({ error: "Credenciais inválidas" }, { status: 401 });
+  }
+
+  // App mobile recebe o token no corpo (guardado no SecureStore do aparelho)
+  if (isMobile) {
+    return Response.json({ user, token: await signToken(user, "7d") });
   }
 
   return Response.json({ user });

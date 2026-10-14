@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { canAccessUnit } from "@/lib/patient-search";
 
 export async function GET(
   _request: NextRequest,
@@ -18,6 +19,7 @@ export async function GET(
       medicalRecords: {
         orderBy: { createdAt: "asc" },
         include: {
+          professional: { select: { name: true } },
           applications: { orderBy: { number: "asc" } },
           thawings: { orderBy: { number: "asc" } },
         },
@@ -26,6 +28,9 @@ export async function GET(
   });
 
   if (!patient) return Response.json({ error: "Paciente não encontrado" }, { status: 404 });
+  if (!canAccessUnit(session, patient.unitId)) {
+    return Response.json({ error: "Sem permissão" }, { status: 403 });
+  }
 
   const lastRecord = patient.medicalRecords[patient.medicalRecords.length - 1];
 
@@ -74,5 +79,13 @@ export async function GET(
       : null,
     previousApplications,
     previousThawings,
+    records: [...patient.medicalRecords].reverse().map((r) => ({
+      id: r.id,
+      serialNumber: r.serialNumber,
+      pathology: r.pathology,
+      status: r.status,
+      createdAt: r.createdAt,
+      professionalName: r.professional.name,
+    })),
   });
 }
