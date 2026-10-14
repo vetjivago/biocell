@@ -1,0 +1,21 @@
+// Patologias mais comuns no tratamento com células-tronco (lista do prontuário)
+export const PATHOLOGIES = [
+  "Displasia coxofemoral",
+  "Doença renal crônica (DRC)",
+  "Doença articular degenerativa (DAD)",
+  "Artrose",
+  "Ruptura de ligamento cruzado cranial",
+  "Doença do disco intervertebral (DDIV)",
+  "Atopia / Dermatite atópica",
+  "Doença inflamatória intestinal (DII)",
+  "Insuficiência hepática crônica",
+  "Ceratoconjuntivite seca (KCS)",
+  "Fratura / Não-união óssea",
+  "Lesão de tendão / ligamento",
+  "Cinomose – sequela neurológica",
+  "Gengivite / Estomatite crônica felina",
+  "Fibrose pulmonar",
+  "Cardiopatia",
+  "Diabetes mellitus",
+  "Epilepsia idiopática",
+];

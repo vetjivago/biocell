@@ -29,6 +29,8 @@ model Unit {
   active         Boolean      @default(true)
   // Prontuário clínico geral (habilitado por unidade; inicialmente só Águas Claras)
   generalRecordEnabled Boolean @default(false)
+  // Ordem de serviço para o preparo das células (inicialmente só Águas Claras)
+  serviceOrderEnabled  Boolean @default(false)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())
@@ -42,6 +44,7 @@ model Unit {
   shipmentsSent        Shipment[]       @relation("ShipmentFrom")
   shipmentsReceived    Shipment[]       @relation("ShipmentTo")
   clinicalEntries      ClinicalEntry[]
+  serviceOrders        ServiceOrder[]
 
   @@index([organizationId])
 }
@@ -63,6 +66,7 @@ model User {
   medicalRecords MedicalRecord[]
   auditLogs      AuditLog[]
   clinicalEntries ClinicalEntry[]
+  serviceOrders   ServiceOrder[]
 
   @@index([organizationId])
 }
@@ -99,6 +103,7 @@ model Patient {
 
   medicalRecords  MedicalRecord[]
   clinicalEntries ClinicalEntry[]
+  serviceOrders   ServiceOrder[]
 
   @@index([unitId])
 }
@@ -170,6 +175,7 @@ model MedicalRecord {
   thawings          Thawing[]
   procedures        Procedure[]
   inventoryTransactions InventoryTransaction[]
+  serviceOrderApplication ServiceOrderApplication?
 
   @@index([patientId])
   @@index([unitId])
@@ -379,4 +385,64 @@ model FollowUpContact {
   createdAt       DateTime @default(now())
 
   @@index([medicalRecordId])
+}
+
+// ── Ordem de Serviço (preparo das células) ──────────────────────
+// Aberta por quem atende; quem prepara as células segue a OS e preenche o prontuário
+model ServiceOrder {
+  id            String   @id @default(cuid())
+  serialNumber  String   @unique
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  unitId        String
+  unit          Unit     @relation(fields: [unitId], references: [id])
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  clinic        String?
+  city          String?
+  disease       String?
+  diagnosisTime String?
+  checklist     String   @default("{}")
+  cancelled     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  applications ServiceOrderApplication[]
+  attachments  ServiceOrderAttachment[]
+
+  @@index([patientId])
+  @@index([unitId])
+}
+
+model ServiceOrderApplication {
+  id              String         @id @default(cuid())
+  serviceOrderId  String
+  serviceOrder    ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  number          Int
+  date            DateTime?
+  veterinarian    String?
+  financial       String?
+  technicalNotes  String?
+  status          String         @default("OPEN")
+  medicalRecordId String?        @unique
+  medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([serviceOrderId, number])
+}
+
+model ServiceOrderAttachment {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  checklistKey   String?
+  fileName       String
+  mimeType       String
+  size           Int
+  data           Bytes
+  uploadedById   String
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId])
 }

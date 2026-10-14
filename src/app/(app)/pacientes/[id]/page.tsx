@@ -6,6 +6,7 @@ import {
   ArrowLeft, Plus, Stethoscope, ClipboardList, FlaskConical, Scale, Pill, Syringe, MessageSquare, FileText, Paperclip, Dna,
 } from "lucide-react";
 import { ENTRY_TYPES, isEntryType, type EntryType } from "@/lib/clinical-types";
+import { ORDER_STATUS, orderStatus } from "@/lib/service-order-types";
 
 const ENTRY_ICONS: Record<EntryType, typeof Stethoscope> = {
   ATENDIMENTO: Stethoscope,
@@ -42,7 +43,11 @@ export default async function PacienteDetailPage({
   const patient = await prisma.patient.findUnique({
     where: { id },
     include: {
-      unit: { select: { name: true, generalRecordEnabled: true } },
+      unit: { select: { name: true, generalRecordEnabled: true, serviceOrderEnabled: true } },
+      serviceOrders: {
+        orderBy: { createdAt: "desc" },
+        include: { applications: { select: { number: true, status: true } } },
+      },
       medicalRecords: {
         include: { professional: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
@@ -68,11 +73,15 @@ export default async function PacienteDetailPage({
   // Linha do tempo: registros do prontuário geral + prontuários de células-tronco
   type TimelineItem =
     | { kind: "entry"; date: Date; entry: (typeof entries)[number] }
-    | { kind: "ct"; date: Date; record: (typeof patient.medicalRecords)[number] };
+    | { kind: "ct"; date: Date; record: (typeof patient.medicalRecords)[number] }
+    | { kind: "os"; date: Date; order: (typeof patient.serviceOrders)[number] };
   const timeline: TimelineItem[] = [
     ...(typeFilter === "CT" ? [] : entries.map((entry) => ({ kind: "entry" as const, date: entry.occurredAt, entry }))),
     ...(!typeFilter || typeFilter === "CT"
-      ? patient.medicalRecords.map((record) => ({ kind: "ct" as const, date: record.createdAt, record }))
+      ? [
+          ...patient.medicalRecords.map((record) => ({ kind: "ct" as const, date: record.createdAt, record })),
+          ...patient.serviceOrders.map((order) => ({ kind: "os" as const, date: order.createdAt, order })),
+        ]
       : []),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -171,6 +180,24 @@ export default async function PacienteDetailPage({
                 <p className="text-lg text-gray-700 mb-2">{year}</p>
                 <div className="space-y-2">
                   {items.map((item) => {
+                    if (item.kind === "os") {
+                      const o = item.order;
+                      const os = ORDER_STATUS[orderStatus(o)];
+                      return (
+                        <Link key={`os-${o.id}`} href={`/ordens-servico/${o.id}`}
+                          className="block bg-white rounded-lg border border-gray-100 border-l-4 px-4 py-3 hover:bg-gray-50"
+                          style={{ borderLeftColor: "#ca8a04" }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500">{fmtDateTime(o.createdAt)}</p>
+                              <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><FlaskConical size={14} /> Ordem de Serviço - Halógena</p>
+                              <p className="text-sm text-gray-600 truncate">Nº {o.serialNumber} · {o.applications.length} aplicação(ões)</p>
+                            </div>
+                            <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${os.cls}`}>{os.label}</span>
+                          </div>
+                        </Link>
+                      );
+                    }
                     if (item.kind === "ct") {
                       const r = item.record;
                       const st = statusConfig[r.status] || statusConfig.OPEN;
@@ -221,6 +248,39 @@ export default async function PacienteDetailPage({
         </div>
       ) : (
         <>
+          {patient.unit.serviceOrderEnabled && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-gray-900">Ordens de serviço ({patient.serviceOrders.length})</h2>
+                <Link href={`/ordens-servico/nova?patientId=${patient.id}`}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/5">
+                  <FlaskConical size={14} /> Nova OS
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {patient.serviceOrders.map((o) => {
+                  const os = ORDER_STATUS[orderStatus(o)];
+                  const pending = o.applications.find((a) => a.status !== "DONE");
+                  return (
+                    <Link key={o.id} href={`/ordens-servico/${o.id}`}
+                      className="flex items-center justify-between gap-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md">
+                      <div>
+                        <p className="font-medium text-gray-900 font-mono">Nº {o.serialNumber}</p>
+                        <p className="text-sm text-gray-500">
+                          {o.applications.length} aplicação(ões){pending ? ` · ${pending.number}ª pendente` : ""} · {o.createdAt.toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${os.cls}`}>{os.label}</span>
+                    </Link>
+                  );
+                })}
+                {patient.serviceOrders.length === 0 && (
+                  <p className="text-sm text-gray-400">Nenhuma OS. Abra uma para enviar ao preparo das células.</p>
+                )}
+              </div>
+            </div>
+          )}
+
           <h2 className="font-semibold text-gray-900 mb-3">Prontuários de células-tronco ({patient.medicalRecords.length})</h2>
           <div className="space-y-3">
             {patient.medicalRecords.map((r) => {

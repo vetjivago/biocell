@@ -12,6 +12,7 @@ import {
   FileText,
   AlertTriangle,
   Menu,
+  FlaskConical,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -20,13 +21,14 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
   { href: "/prontuarios", label: "Prontuários", icon: ClipboardList, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
   { href: "/pacientes", label: "Pacientes", icon: Users, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
+  { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"], serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "UNIT_MANAGER"] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "UNIT_MANAGER"] },
   { href: "/alertas", label: "Alertas", icon: AlertTriangle, roles: null },
 ];
 
-export default function Sidebar({ userName, userRole }: { userName: string; userRole: string }) {
+export default function Sidebar({ userName, userRole, hasServiceOrders = false }: { userName: string; userRole: string; hasServiceOrders?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -48,7 +50,7 @@ export default function Sidebar({ userName, userRole }: { userName: string; user
     <>
       <button
         onClick={() => setOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 bg-sidebar text-white p-2 rounded-lg"
+        className="lg:hidden print:hidden fixed top-4 left-4 z-50 bg-sidebar text-white p-2 rounded-lg"
       >
         <Menu size={20} />
       </button>
@@ -58,7 +60,7 @@ export default function Sidebar({ userName, userRole }: { userName: string; user
       )}
 
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50
+        fixed lg:static inset-y-0 left-0 z-50 print:hidden
         w-64 bg-sidebar text-white flex flex-col
         transform transition-transform lg:translate-x-0
         ${open ? "translate-x-0" : "-translate-x-full"}
@@ -83,7 +85,7 @@ export default function Sidebar({ userName, userRole }: { userName: string; user
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(userRole)).map((item) => {
+          {NAV_ITEMS.filter((item) => (!item.roles || item.roles.includes(userRole)) && (!("serviceOrders" in item) || hasServiceOrders)).map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

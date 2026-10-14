@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { normalizeSpecies } from "@/lib/species";
+import { PATHOLOGIES } from "@/lib/pathologies";
 
 interface Unit { id: string; name: string; }
 interface AppItem { category: Category; batchId: string; quantity: string; }
@@ -30,31 +31,25 @@ const ITEM_CATEGORIES: { key: Category; label: string; unit: string }[] = [
 ];
 interface ThawEntry { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string; readonly?: boolean; }
 
-const PATHOLOGIES = [
-  "Displasia coxofemoral",
-  "Doença renal crônica (DRC)",
-  "Doença articular degenerativa (DAD)",
-  "Artrose",
-  "Ruptura de ligamento cruzado cranial",
-  "Doença do disco intervertebral (DDIV)",
-  "Atopia / Dermatite atópica",
-  "Doença inflamatória intestinal (DII)",
-  "Insuficiência hepática crônica",
-  "Ceratoconjuntivite seca (KCS)",
-  "Fratura / Não-união óssea",
-  "Lesão de tendão / ligamento",
-  "Cinomose – sequela neurológica",
-  "Gengivite / Estomatite crônica felina",
-  "Fibrose pulmonar",
-  "Cardiopatia",
-  "Diabetes mellitus",
-  "Epilepsia idiopática",
-];
+
+
+// Uma linha por categoria; pré-seleciona o lote quando a unidade só tem um daquela categoria
+function defaultItemsFor(list: StockItem[], patientSpecies: string): AppItem[] {
+  return ITEM_CATEGORIES.map((c) => {
+    const lots = lotsFor(list, c.key, patientSpecies);
+    return { category: c.key, batchId: lots.length === 1 ? lots[0].batchId : "", quantity: "" };
+  });
+}
 
 function NovoProntuarioForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const patientId = searchParams.get("patientId");
+  const osAppId = searchParams.get("osApp");
+  const [osApp, setOsApp] = useState<{
+    id: string; number: number; status: string; medicalRecordId: string | null; veterinarian: string | null; technicalNotes: string | null;
+    serviceOrder: { id: string; serialNumber: string; patientId: string; disease: string | null };
+  } | null>(null);
 
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,6 +65,8 @@ function NovoProntuarioForm() {
     donors: "", serumCollected: false,
   });
   const [stock, setStock] = useState<StockItem[] | null>(null);
+  // Cópia do estoque para os callbacks assíncronos (o paciente e o estoque podem chegar em qualquer ordem)
+  const stockRef = useRef<StockItem[] | null>(null);
   const [applications, setApplications] = useState<AppEntry[]>([
     { number: 1, date: "", cells: "", serum: "", medium: "", items: [] },
   ]);
@@ -83,10 +80,15 @@ function NovoProntuarioForm() {
 
   useEffect(() => {
     if (!patientId) return;
-    setLoadingPatient(true);
-    fetch(`/api/patients/${patientId}`)
-      .then((r) => r.json())
-      .then((data) => {
+    // Paciente e (se houver) a aplicação da OS são carregados juntos: a doença da OS vale para este tratamento
+    Promise.all([
+      fetch(`/api/patients/${patientId}`).then((r) => r.json()),
+      osAppId ? fetch(`/api/service-order-applications/${osAppId}`).then((r) => r.json()) : Promise.resolve(null),
+    ])
+      .then(([data, os]) => {
+        if (os?.error) setError(os.error);
+        else if (os) setOsApp(os);
+        const osDisease: string | null = os && !os.error ? os.serviceOrder.disease : null;
         if (data.error) {
           setError(data.error);
           setLoadingPatient(false);
@@ -95,7 +97,8 @@ function NovoProntuarioForm() {
         setIsExistingPatient(true);
         const p = data.patient;
         const lr = data.lastRecord;
-        if (lr?.pathology && !PATHOLOGIES.includes(lr.pathology)) {
+        const pathology = osDisease || lr?.pathology || "";
+        if (pathology && !PATHOLOGIES.includes(pathology)) {
           setIsCustomPathology(true);
         }
         setForm({
@@ -107,7 +110,7 @@ function NovoProntuarioForm() {
           veterinarian: p.veterinarian || "",
           clinic: p.clinic || "",
           unitId: p.unitId,
-          pathology: lr?.pathology || "",
+          pathology,
           cellQuantity: "",
           applicationRoute: lr?.applicationRoute || "",
           donors: lr?.donors || "",
@@ -120,7 +123,9 @@ function NovoProntuarioForm() {
         const nextAppNum = prevApps.length > 0 ? Math.max(...prevApps.map((a: AppEntry) => a.number)) + 1 : 1;
         setApplications([
           ...prevApps,
-          { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: [] },
+          stockRef.current
+            ? { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: defaultItemsFor(stockRef.current, p.species), itemsInit: true }
+            : { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: [] },
         ]);
 
         const prevThaws: ThawEntry[] = (data.previousThawings || []).map((t: ThawEntry) => ({
@@ -138,32 +143,24 @@ function NovoProntuarioForm() {
         setError("Erro ao carregar dados do paciente");
         setLoadingPatient(false);
       });
-  }, [patientId]);
+  }, [patientId, osAppId]);
 
+  const species = form.patientSpecies;
   // Lotes disponíveis no estoque da unidade do paciente (abastecidos pela matriz)
   useEffect(() => {
     if (!form.unitId) return;
     fetch(`/api/inventory/stock?unitId=${form.unitId}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: StockItem[]) => setStock(data))
+      .then((data: StockItem[]) => {
+        stockRef.current = data;
+        setStock(data);
+        setApplications((apps) => apps.map((a) => (a.readonly || a.itemsInit ? a : { ...a, items: defaultItemsFor(data, species), itemsInit: true })));
+      })
       .catch(() => setStock([]));
-  }, [form.unitId]);
-
-  // Cada nova aplicação começa com uma linha por categoria; pré-seleciona o lote quando há só um
-  useEffect(() => {
-    if (!stock || !applications.some((a) => !a.readonly && !a.itemsInit)) return;
-    setApplications((apps) => apps.map((a) => (a.readonly || a.itemsInit ? a : { ...a, items: defaultItems(stock), itemsInit: true })));
-  }, [stock, applications]);
-
-  function defaultItems(list: StockItem[], patientSpecies = form.patientSpecies): AppItem[] {
-    return ITEM_CATEGORIES.map((c) => {
-      const lots = lotsFor(list, c.key, patientSpecies);
-      return { category: c.key, batchId: lots.length === 1 ? lots[0].batchId : "", quantity: "" };
-    });
-  }
+  }, [form.unitId, species]);
 
   function newApplication(number: number): AppEntry {
-    return { number, date: "", cells: "", serum: "", medium: "", items: [] };
+    return { number, date: "", cells: "", serum: "", medium: "", items: stock ? defaultItemsFor(stock, form.patientSpecies) : [], itemsInit: !!stock };
   }
 
   function updateItem(appIdx: number, itemIdx: number, field: "batchId" | "quantity", value: string) {
@@ -243,6 +240,7 @@ function NovoProntuarioForm() {
     const payload = {
       ...form,
       ...(isExistingPatient ? { patientId } : {}),
+      ...(osApp ? { serviceOrderApplicationId: osApp.id } : {}),
       patientWeight: form.patientWeight ? parseFloat(form.patientWeight) : null,
       applications: newApps,
       thawings: newThaws,
@@ -304,6 +302,15 @@ function NovoProntuarioForm() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
         {isExistingPatient ? `Novo Prontuário – ${form.patientName}` : "Novo Prontuário de Células-Tronco"}
       </h1>
+
+      {osApp && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm mb-4">
+          Preenchendo a partir da <Link href={`/ordens-servico/${osApp.serviceOrder.id}`} className="font-semibold underline">OS nº {osApp.serviceOrder.serialNumber}</Link> – {osApp.number}ª aplicação
+          {osApp.veterinarian ? ` · Veterinário: ${osApp.veterinarian}` : ""}
+          {osApp.technicalNotes ? <span className="block mt-1 whitespace-pre-line">Observações técnicas: {osApp.technicalNotes}</span> : null}
+          {osApp.medicalRecordId ? <span className="block mt-1 font-semibold">Esta aplicação já tem prontuário preenchido.</span> : null}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Identificação */}

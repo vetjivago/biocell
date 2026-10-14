@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     patientId: existingPatientId,
     pathology, cellQuantity, applicationRoute,
     donors, serumCollected, applications, thawings,
+    serviceOrderApplicationId,
   } = body;
 
   if (!existingPatientId) {
@@ -58,6 +59,21 @@ export async function POST(request: NextRequest) {
 
   if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
+  }
+
+  // Prontuário preenchido a partir de uma aplicação da Ordem de Serviço
+  let serviceOrderApp: { id: string } | null = null;
+  if (serviceOrderApplicationId) {
+    const soa = await prisma.serviceOrderApplication.findUnique({
+      where: { id: String(serviceOrderApplicationId) },
+      include: { serviceOrder: { select: { patientId: true, cancelled: true } } },
+    });
+    if (!soa || soa.serviceOrder.patientId !== existingPatientId) {
+      return Response.json({ error: "Ordem de serviço não corresponde a este paciente" }, { status: 400 });
+    }
+    if (soa.serviceOrder.cancelled) return Response.json({ error: "Ordem de serviço cancelada" }, { status: 400 });
+    if (soa.medicalRecordId) return Response.json({ error: "Esta aplicação da OS já tem prontuário preenchido" }, { status: 409 });
+    serviceOrderApp = { id: soa.id };
   }
 
   type AppItemInput = { batchId?: string; category?: string; quantity?: number | string };
@@ -174,15 +190,27 @@ export async function POST(request: NextRequest) {
           action: "CREATE",
           entity: "MedicalRecord",
           entityId: mr.id,
-          details: JSON.stringify({ patientName: existingPatient.name, pathology }),
+          details: JSON.stringify({ patientName: existingPatient.name, pathology, serviceOrderApplicationId: serviceOrderApp?.id }),
         },
       });
+
+      if (serviceOrderApp) {
+        // updateMany com medicalRecordId nulo evita vincular duas vezes em requisições simultâneas
+        const linked = await tx.serviceOrderApplication.updateMany({
+          where: { id: serviceOrderApp.id, medicalRecordId: null },
+          data: { medicalRecordId: mr.id, status: "DONE" },
+        });
+        if (linked.count === 0) throw new Error("OS_ALREADY_LINKED");
+      }
 
       return mr;
     });
 
     return Response.json(record, { status: 201 });
   } catch (err) {
+    if (err instanceof Error && err.message === "OS_ALREADY_LINKED") {
+      return Response.json({ error: "Esta aplicação da OS já tem prontuário preenchido" }, { status: 409 });
+    }
     console.error("Erro ao criar prontuário:", err);
     return Response.json({ error: "Erro ao registrar prontuário" }, { status: 500 });
   }

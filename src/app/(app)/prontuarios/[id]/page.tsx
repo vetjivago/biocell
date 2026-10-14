@@ -27,6 +27,7 @@ export default async function ProntuarioDetailPage({
       },
       thawings: { orderBy: { number: "asc" } },
       procedures: { orderBy: { date: "desc" } },
+      serviceOrderApplication: { select: { number: true, serviceOrder: { select: { id: true, serialNumber: true } } } },
       inventoryTransactions: {
         include: { batch: { include: { product: { select: { name: true } } } } },
       },
@@ -62,6 +63,13 @@ export default async function ProntuarioDetailPage({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Prontuário de Células-Tronco</h1>
           <p className="text-sm text-gray-500 mt-1">Nº {record.serialNumber.slice(0, 12)} • {record.unit.name}</p>
+          {record.serviceOrderApplication && (
+            <p className="text-sm mt-1">
+              <Link href={`/ordens-servico/${record.serviceOrderApplication.serviceOrder.id}`} className="text-primary hover:underline">
+                OS nº {record.serviceOrderApplication.serviceOrder.serialNumber} – {record.serviceOrderApplication.number}ª aplicação
+              </Link>
+            </p>
+          )}
         </div>
         <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${st.cls}`}>{st.label}</span>
       </div>
