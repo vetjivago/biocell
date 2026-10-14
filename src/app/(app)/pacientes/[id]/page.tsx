@@ -2,21 +2,47 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus } from "lucide-react";
+import {
+  ArrowLeft, Plus, Stethoscope, ClipboardList, FlaskConical, Scale, Pill, Syringe, MessageSquare, FileText, Paperclip, Dna,
+} from "lucide-react";
+import { ENTRY_TYPES, isEntryType, type EntryType } from "@/lib/clinical-types";
+
+const ENTRY_ICONS: Record<EntryType, typeof Stethoscope> = {
+  ATENDIMENTO: Stethoscope,
+  ANAMNESE: ClipboardList,
+  EXAME: FlaskConical,
+  PESO: Scale,
+  RECEITA: Pill,
+  VACINA: Syringe,
+  OBSERVACAO: MessageSquare,
+  DOCUMENTO: FileText,
+};
+
+const statusConfig: Record<string, { label: string; cls: string }> = {
+  OPEN: { label: "Aberto", cls: "bg-blue-100 text-blue-700" },
+  IN_PROGRESS: { label: "Em andamento", cls: "bg-yellow-100 text-yellow-700" },
+  COMPLETED: { label: "Concluído", cls: "bg-green-100 text-green-700" },
+  CANCELLED: { label: "Cancelado", cls: "bg-gray-100 text-gray-700" },
+};
+
+const CT_COLOR = "#2d7a3a";
 
 export default async function PacienteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ aba?: string; tipo?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
   const { id } = await params;
+  const { aba, tipo } = await searchParams;
 
   const patient = await prisma.patient.findUnique({
     where: { id },
     include: {
-      unit: { select: { name: true } },
+      unit: { select: { name: true, generalRecordEnabled: true } },
       medicalRecords: {
         include: { professional: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
@@ -25,25 +51,51 @@ export default async function PacienteDetailPage({
   });
 
   if (!patient) notFound();
+  if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) notFound();
 
-  const statusConfig: Record<string, { label: string; cls: string }> = {
-    OPEN: { label: "Aberto", cls: "bg-blue-100 text-blue-700" },
-    IN_PROGRESS: { label: "Em andamento", cls: "bg-yellow-100 text-yellow-700" },
-    COMPLETED: { label: "Concluído", cls: "bg-green-100 text-green-700" },
-    CANCELLED: { label: "Cancelado", cls: "bg-gray-100 text-gray-700" },
-  };
+  const generalEnabled = patient.unit.generalRecordEnabled;
+  const tab = generalEnabled && aba !== "ct" ? "geral" : "ct";
+  const typeFilter = tipo === "CT" || isEntryType(tipo) ? tipo : undefined;
+
+  const entries = tab === "geral"
+    ? await prisma.clinicalEntry.findMany({
+        where: { patientId: id, ...(typeFilter && typeFilter !== "CT" ? { type: typeFilter } : {}) },
+        orderBy: { occurredAt: "desc" },
+        include: { author: { select: { name: true } }, _count: { select: { attachments: true } } },
+      })
+    : [];
+
+  // Linha do tempo: registros do prontuário geral + prontuários de células-tronco
+  type TimelineItem =
+    | { kind: "entry"; date: Date; entry: (typeof entries)[number] }
+    | { kind: "ct"; date: Date; record: (typeof patient.medicalRecords)[number] };
+  const timeline: TimelineItem[] = [
+    ...(typeFilter === "CT" ? [] : entries.map((entry) => ({ kind: "entry" as const, date: entry.occurredAt, entry }))),
+    ...(!typeFilter || typeFilter === "CT"
+      ? patient.medicalRecords.map((record) => ({ kind: "ct" as const, date: record.createdAt, record }))
+      : []),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const byYear = new Map<number, TimelineItem[]>();
+  for (const item of timeline) {
+    const y = item.date.getFullYear();
+    byYear.set(y, [...(byYear.get(y) || []), item]);
+  }
+
+  const fmtDateTime = (d: Date) =>
+    d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).replace(",", " às");
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <Link href="/pacientes" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4">
         <ArrowLeft size={16} /> Voltar
       </Link>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <h1 className="text-2xl font-bold text-gray-900">{patient.name}</h1>
-          <Link href={`/prontuarios/novo?patientId=${patient.id}`} className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-3 py-2 rounded-lg text-sm font-medium">
-            <Plus size={14} /> Novo Prontuário
+          <Link href={`/prontuarios/novo?patientId=${patient.id}`} className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
+            <Plus size={14} /> Prontuário CT
           </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -58,26 +110,152 @@ export default async function PacienteDetailPage({
         </div>
       </div>
 
-      <h2 className="font-semibold text-gray-900 mb-3">Prontuários ({patient.medicalRecords.length})</h2>
-      <div className="space-y-3">
-        {patient.medicalRecords.map((r) => {
-          const st = statusConfig[r.status] || statusConfig.OPEN;
-          return (
-            <Link key={r.id} href={`/prontuarios/${r.id}`} className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{r.pathology}</p>
-                  <p className="text-sm text-gray-500">Dr(a). {r.professional.name} • {new Date(r.createdAt).toLocaleDateString("pt-BR")}</p>
-                </div>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
-              </div>
+      {generalEnabled && (
+        <div className="flex gap-1 border-b border-gray-200 mb-4">
+          {[
+            { key: "geral", label: "Prontuário geral" },
+            { key: "ct", label: `Células-tronco (${patient.medicalRecords.length})` },
+          ].map((t) => (
+            <Link
+              key={t.key}
+              href={`/pacientes/${patient.id}${t.key === "ct" ? "?aba=ct" : ""}`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px ${tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            >
+              {t.label}
             </Link>
-          );
-        })}
-        {patient.medicalRecords.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-8">Nenhum prontuário registrado</p>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "geral" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          {/* Adicionar (aparece primeiro no celular) */}
+          <div className="lg:order-2">
+            <h2 className="font-semibold text-gray-900 mb-3">Adicionar</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(ENTRY_TYPES) as EntryType[]).map((key) => {
+                const Icon = ENTRY_ICONS[key];
+                return (
+                  <Link
+                    key={key}
+                    href={`/pacientes/${patient.id}/geral/novo?tipo=${key}`}
+                    style={{ backgroundColor: ENTRY_TYPES[key].color }}
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-lg py-3 px-2 text-white text-sm font-medium hover:opacity-90 text-center"
+                  >
+                    <Icon size={20} />
+                    {ENTRY_TYPES[key].label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Linha do tempo */}
+          <div className="lg:order-1 min-w-0">
+            <div className="flex flex-wrap gap-2 mb-4">
+              <FilterChip href={`/pacientes/${patient.id}`} active={!typeFilter} label="Todos" />
+              {(Object.keys(ENTRY_TYPES) as EntryType[]).map((key) => (
+                <FilterChip key={key} href={`/pacientes/${patient.id}?tipo=${key}`} active={typeFilter === key} label={ENTRY_TYPES[key].label} />
+              ))}
+              <FilterChip href={`/pacientes/${patient.id}?tipo=CT`} active={typeFilter === "CT"} label="Células-tronco" />
+            </div>
+
+            {timeline.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
+                Nenhum registro {typeFilter ? "deste tipo" : "no prontuário"} ainda. Use os botões em “Adicionar”.
+              </div>
+            )}
+
+            {[...byYear.entries()].map(([year, items]) => (
+              <div key={year} className="mb-4">
+                <p className="text-lg text-gray-700 mb-2">{year}</p>
+                <div className="space-y-2">
+                  {items.map((item) => {
+                    if (item.kind === "ct") {
+                      const r = item.record;
+                      const st = statusConfig[r.status] || statusConfig.OPEN;
+                      return (
+                        <Link key={`ct-${r.id}`} href={`/prontuarios/${r.id}`}
+                          className="block bg-white rounded-lg border border-gray-100 border-l-4 px-4 py-3 hover:bg-gray-50"
+                          style={{ borderLeftColor: CT_COLOR }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500">{fmtDateTime(r.createdAt)}</p>
+                              <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Dna size={14} /> Prontuário CT</p>
+                              <p className="text-sm text-gray-600 truncate">{r.pathology} · Nº {r.serialNumber.slice(0, 8)}</p>
+                            </div>
+                            <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
+                          </div>
+                        </Link>
+                      );
+                    }
+                    const e = item.entry;
+                    const t = isEntryType(e.type) ? ENTRY_TYPES[e.type] : { label: e.type, color: "#6b7280" };
+                    const summary = e.type === "PESO"
+                      ? `${e.weight?.toLocaleString("pt-BR")} kg${e.title ? ` – ${e.title}` : ""}`
+                      : e.title || e.content.split("\n").find((l) => l.trim()) || "";
+                    return (
+                      <Link key={e.id} href={`/pacientes/${patient.id}/geral/${e.id}`}
+                        className="block bg-white rounded-lg border border-gray-100 border-l-4 px-4 py-3 hover:bg-gray-50"
+                        style={{ borderLeftColor: t.color }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs text-gray-500">{fmtDateTime(e.occurredAt)}</p>
+                            <p className="text-sm font-semibold text-gray-900">{t.label}</p>
+                            <p className="text-sm text-gray-600 truncate">{summary}</p>
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-1 text-xs text-gray-400">
+                            <span title={e.author.name}>{initials(e.author.name)}</span>
+                            {e._count.attachments > 0 && (
+                              <span className="flex items-center gap-0.5"><Paperclip size={12} />{e._count.attachments}</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          <h2 className="font-semibold text-gray-900 mb-3">Prontuários de células-tronco ({patient.medicalRecords.length})</h2>
+          <div className="space-y-3">
+            {patient.medicalRecords.map((r) => {
+              const st = statusConfig[r.status] || statusConfig.OPEN;
+              return (
+                <Link key={r.id} href={`/prontuarios/${r.id}`} className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{r.pathology}</p>
+                      <p className="text-sm text-gray-500">{r.professional.name} • {new Date(r.createdAt).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
+            {patient.medicalRecords.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">Nenhum prontuário registrado</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
+}
+
+function FilterChip({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link href={href}
+      className={`px-3 py-1 rounded-full text-xs font-medium border ${active ? "bg-primary text-white border-primary" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"}`}>
+      {label}
+    </Link>
+  );
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).filter((p) => p && !/^(dr|dra)\.?$/i.test(p)).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 }
