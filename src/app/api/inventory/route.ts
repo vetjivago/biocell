@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { normalizeSpecies } from "@/lib/species";
+import { normalizeBatchNumber, standardProduct } from "@/lib/products";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { unitId, batchId, batchNumber, productName, productCategory, type, quantity, reason } = body;
+  const { unitId, batchId, productId, type, quantity, reason } = body;
 
   if (!unitId || !type || !quantity) {
     return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
@@ -46,33 +46,17 @@ export async function POST(request: NextRequest) {
 
   let resolvedBatchId = batchId;
 
-  if (!resolvedBatchId && batchNumber && productName) {
-    let product = await prisma.cellProduct.findFirst({
-      where: { name: { equals: productName, mode: "insensitive" } },
-    });
-    if (!product) {
-      product = await prisma.cellProduct.create({
-        data: {
-          name: productName,
-          category: productCategory || "CELULAS",
-          species: (productCategory || "CELULAS") === "CELULAS" ? normalizeSpecies(productName) : null,
-        },
-      });
-    }
+  // Lote novo: produto vem do catálogo padronizado (CTM CANINO/FELINO/EQUINO, SORO, MEIO)
+  if (!resolvedBatchId && body.batchNumber) {
+    const product = standardProduct(productId);
+    if (!product) return Response.json({ error: "Escolha o produto na lista" }, { status: 400 });
+    const batchNumber = normalizeBatchNumber(String(body.batchNumber)).slice(0, 80);
+    if (!batchNumber) return Response.json({ error: "Informe o lote" }, { status: 400 });
 
-    let batch = await prisma.cellBatch.findFirst({
-      where: { batchNumber, productId: product.id },
-    });
+    let batch = await prisma.cellBatch.findFirst({ where: { batchNumber, productId: product.id } });
     if (!batch) {
-      batch = await prisma.cellBatch.create({
-        data: {
-          batchNumber,
-          productId: product.id,
-          totalStraws: 0,
-        },
-      });
+      batch = await prisma.cellBatch.create({ data: { batchNumber, productId: product.id, totalStraws: 0 } });
     }
-
     resolvedBatchId = batch.id;
   }
 

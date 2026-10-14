@@ -6,7 +6,7 @@ export async function GET() {
   if (!session) return Response.json([], { status: 401 });
 
   const batches = await prisma.cellBatch.findMany({
-    include: { product: { select: { name: true, code: true, species: true } } },
+    include: { product: { select: { id: true, name: true, code: true, species: true } } },
     orderBy: { batchNumber: "asc" },
   });
 

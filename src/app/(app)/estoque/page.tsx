@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle, Beaker, Droplets } from "lucide-react";
 import SupplyForm from "./SupplyForm";
+import { STANDARD_PRODUCTS } from "@/lib/products";
+
+const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a" };
 
 export default async function EstoquePage() {
   const session = await getSession();
@@ -79,48 +82,32 @@ export default async function EstoquePage() {
         {isAdmin && <Suspense><SupplyForm /></Suspense>}
       </div>
 
-      {/* Resumo */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <Package className="text-primary" size={24} />
-            <div>
-              <p className="text-sm text-gray-500">Células-Tronco</p>
-              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "CELULAS").reduce((sum, i) => sum + i.balance, 0)}</p>
-              <p className="text-xs text-gray-400">palhetas</p>
+      {/* Resumo: palhetas por espécie + insumos */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {[
+          ...STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS").map((p) => ({
+            key: p.id, label: p.name, unit: p.unit, icon: Package, color: SPECIES_COLOR[p.species!],
+            value: stock.filter((s) => s.category === "CELULAS" && s.species === p.species).reduce((sum, i) => sum + i.balance, 0),
+          })),
+          { key: "meio", label: "MEIO", unit: "unidades", icon: Beaker, color: "#2563eb", value: stock.filter((s) => s.category === "MEIO").reduce((sum, i) => sum + i.balance, 0) },
+          { key: "soro", label: "SORO", unit: "unidades", icon: Droplets, color: "#7c3aed", value: stock.filter((s) => s.category === "SORO").reduce((sum, i) => sum + i.balance, 0) },
+          { key: "alertas", label: "Alertas ativos", unit: "", icon: AlertTriangle, color: "#f59e0b", value: activeAlerts },
+        ].map((c) => (
+          <div key={c.key} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <c.icon size={24} style={{ color: c.color }} />
+              <div>
+                <p className="text-sm text-gray-500">{c.label}</p>
+                <p className="text-2xl font-bold">{c.value}</p>
+                {c.unit && <p className="text-xs text-gray-400">{c.unit}</p>}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <Beaker className="text-blue-500" size={24} />
-            <div>
-              <p className="text-sm text-gray-500">Meio de Preparo</p>
-              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "MEIO").reduce((sum, i) => sum + i.balance, 0)}</p>
-              <p className="text-xs text-gray-400">unidades</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <Droplets className="text-purple-500" size={24} />
-            <div>
-              <p className="text-sm text-gray-500">Soro</p>
-              <p className="text-2xl font-bold">{stock.filter((s) => s.category === "SORO").reduce((sum, i) => sum + i.balance, 0)}</p>
-              <p className="text-xs text-gray-400">unidades</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="text-amber-500" size={24} />
-            <div>
-              <p className="text-sm text-gray-500">Alertas Ativos</p>
-              <p className="text-2xl font-bold">{activeAlerts}</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
+      <p className="text-xs text-gray-400 -mt-4 mb-6">
+        Total de células-tronco: {stock.filter((s) => s.category === "CELULAS").reduce((sum, i) => sum + i.balance, 0)} palhetas
+      </p>
 
       {/* Estoque por Unidade/Lote */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">

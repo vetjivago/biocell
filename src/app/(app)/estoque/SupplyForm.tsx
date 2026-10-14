@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, X, Loader2, PenLine } from "lucide-react";
+import { STANDARD_PRODUCTS } from "@/lib/products";
 
 type Unit = { id: string; name: string };
 type Batch = {
   id: string;
   batchNumber: string;
-  product: { name: string; code: string | null; species: string | null };
+  product: { id: string; name: string; code: string | null; species: string | null };
 };
 
 export default function SupplyForm() {
@@ -27,8 +28,7 @@ export default function SupplyForm() {
 
   const [unitId, setUnitId] = useState(preselectedUnitId);
   const [batchId, setBatchId] = useState("");
-  const [productName, setProductName] = useState("");
-  const [productCategory, setProductCategory] = useState("CELULAS");
+  const [productId, setProductId] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
@@ -65,8 +65,7 @@ export default function SupplyForm() {
     };
 
     if (manual) {
-      payload.productName = productName;
-      payload.productCategory = productCategory;
+      payload.productId = productId;
       payload.batchNumber = batchNumber;
     } else {
       payload.batchId = batchId;
@@ -82,7 +81,7 @@ export default function SupplyForm() {
       setSuccess("Estoque atualizado com sucesso!");
       setUnitId("");
       setBatchId("");
-      setProductName("");
+      setProductId("");
       setBatchNumber("");
       setQuantity("");
       setReason("");
@@ -146,7 +145,7 @@ export default function SupplyForm() {
                 className="flex items-center gap-1 text-xs text-primary hover:underline"
               >
                 <PenLine size={12} />
-                Cadastrar novo
+                Lote novo
               </button>
             </div>
             <select
@@ -156,18 +155,21 @@ export default function SupplyForm() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="">Selecione o lote...</option>
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.product.name} – Lote {b.batchNumber} {b.product.species ? `(${b.product.species})` : ""}
-                </option>
-              ))}
+              {STANDARD_PRODUCTS.map((p) => {
+                const lots = batches.filter((b) => b.product.id === p.id);
+                return lots.length === 0 ? null : (
+                  <optgroup key={p.id} label={p.name}>
+                    {lots.map((b) => <option key={b.id} value={b.id}>{p.name} – Lote {b.batchNumber}</option>)}
+                  </optgroup>
+                );
+              })}
             </select>
           </div>
         ) : (
           <>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Produto (novo)</label>
+                <label className="block text-sm font-medium text-gray-700">Produto</label>
                 <button
                   type="button"
                   onClick={() => setManual(false)}
@@ -176,25 +178,14 @@ export default function SupplyForm() {
                   Selecionar existente
                 </button>
               </div>
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                required
-                placeholder="Ex: CTM Alogênica Canina"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
               <select
-                value={productCategory}
-                onChange={(e) => setProductCategory(e.target.value)}
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                required
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
               >
-                <option value="CELULAS">Células-Tronco</option>
-                <option value="MEIO">Meio de Preparo</option>
-                <option value="SORO">Soro</option>
+                <option value="">Selecione o produto...</option>
+                {STANDARD_PRODUCTS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
