@@ -96,16 +96,32 @@ model Patient {
   ownerEmail      String?
   veterinarian    String?
   clinic          String?
+  sex             String?
+  neutered        Boolean  @default(false)
+  coat            String?
+  birthDate       DateTime?
+  microchip       String?
+  ownerAddress    String?
   unitId          String
   unit            Unit     @relation(fields: [unitId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  photo           PatientPhoto?
   medicalRecords  MedicalRecord[]
   clinicalEntries ClinicalEntry[]
   serviceOrders   ServiceOrder[]
 
   @@index([unitId])
+}
+
+// Foto do animal (tabela separada para não carregar os bytes nas listagens)
+model PatientPhoto {
+  patientId String   @id
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  mimeType  String
+  data      Bytes
+  updatedAt DateTime @updatedAt
 }
 
 // ── Prontuário Clínico Geral ────────────────────────────────────
@@ -122,6 +138,11 @@ model ClinicalEntry {
   title       String?
   content     String   @default("")
   weight      Float?
+  // Tipo do atendimento (Aplicação CT, Retorno, C15...), retorno agendado, alta da internação, link de vídeo
+  subtype     String?
+  returnDate  DateTime?
+  endedAt     DateTime?
+  videoUrl    String?
   occurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

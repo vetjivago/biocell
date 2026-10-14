@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { parseSearchField, patientSearchWhere } from "@/lib/patient-search";
+import { parsePatientFields } from "@/lib/patient-fields";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -23,19 +24,19 @@ export async function POST(request: NextRequest) {
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
 
   const body = await request.json();
-  const { name, species, breed, weight, ownerName, ownerPhone, ownerEmail, veterinarian, clinic, unitId } = body;
-
-  if (!name || !species || !ownerName || !unitId) {
-    return Response.json({ error: "Campos obrigatórios faltando" }, { status: 400 });
-  }
+  const unitId = typeof body.unitId === "string" ? body.unitId : "";
+  if (!unitId) return Response.json({ error: "Informe a unidade" }, { status: 400 });
+  const parsed = parsePatientFields(body);
+  if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
 
   if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 
   const patient = await prisma.patient.create({
-    data: { name, species, breed, weight, ownerName, ownerPhone, ownerEmail, veterinarian, clinic, unitId },
+    data: { ...(parsed.data as { name: string; species: string; ownerName: string }), unitId },
   });
+  const { name, species } = patient;
 
   await prisma.auditLog.create({
     data: { userId: session.id, action: "CREATE", entity: "Patient", entityId: patient.id, details: JSON.stringify({ name, species }) },

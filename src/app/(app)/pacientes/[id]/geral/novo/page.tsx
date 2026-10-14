@@ -32,7 +32,7 @@ export default async function NovoRegistroPage({
       <p className="text-sm text-gray-500 mb-6">
         {p.name} · {p.species}{p.breed ? ` · ${p.breed}` : ""} · Tutor: {p.ownerName}
       </p>
-      <EntryForm patientId={id} initial={{ type, title: "", content: "", weight: "", occurredAt: null }} />
+      <EntryForm patientId={id} initial={{ type, title: "", content: "", weight: "", subtype: "", returnDate: "", endedAt: null, videoUrl: "", occurredAt: null }} />
     </div>
   );
 }

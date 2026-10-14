@@ -1,9 +1,13 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, X, FileText } from "lucide-react";
-import { ENTRY_TEMPLATES, ENTRY_TYPES, MAX_ATTACHMENT_BYTES, type EntryType } from "@/lib/clinical-types";
+import { compressImage } from "@/lib/compress-image";
+import { PATHOLOGIES } from "@/lib/pathologies";
+import {
+  ATTENDANCE_SUBTYPES, ENTRY_TEMPLATES, ENTRY_TYPES, MAX_ATTACHMENT_BYTES, TITLE_LABEL, type EntryType,
+} from "@/lib/clinical-types";
 
 interface Initial {
   id?: string;
@@ -11,9 +15,19 @@ interface Initial {
   title: string;
   content: string;
   weight: string;
+  subtype: string;
+  returnDate: string; // AAAA-MM-DD
+  endedAt: string | null; // ISO
+  videoUrl: string;
   occurredAt: string | null; // ISO; null = agora
   attachments?: { id: string; fileName: string; size: number }[];
 }
+
+type Draft = Pick<Initial, "title" | "content" | "weight" | "subtype" | "returnDate" | "videoUrl"> & { savedAt: number };
+
+const AUTOSAVE_MS = 20_000;
+const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
+const label = "block text-sm font-medium text-gray-700 mb-1";
 
 // Data/hora local no formato do input datetime-local
 function toLocalInput(date: Date) {
@@ -25,42 +39,70 @@ function formatSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Fotos de celular costumam passar de 4 MB: reduz para JPEG até 2000px antes de enviar
-async function compressImage(file: File): Promise<File> {
-  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.size < 1.5 * 1024 * 1024) return file;
+function readDraft(key: string): Draft | null {
   try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as Draft) : null;
   } catch {
-    return file; // formato não suportado pelo navegador (ex.: HEIC): envia como está
+    return null;
   }
 }
 
 export default function EntryForm({ patientId, initial }: { patientId: string; initial: Initial }) {
   const router = useRouter();
-  const isEdit = !!initial.id;
   const [form, setForm] = useState(initial);
-  // A data padrão usa o relógio/fuso do aparelho; só é calculada no navegador (evita divergência com o servidor)
+  // Depois de criado (ex.: anexo falhou), novas tentativas atualizam o mesmo registro
+  const [entryId, setEntryId] = useState<string | undefined>(initial.id);
+  const isEdit = !!initial.id;
+
+  // Datas padrão usam o relógio/fuso do aparelho; só calculadas no navegador (evita divergência com o servidor)
   const isClient = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [baseDate] = useState(() => (initial.occurredAt ? new Date(initial.occurredAt) : new Date()));
   const [localDate, setLocalDate] = useState<string | null>(null);
   const occurredInput = localDate ?? (isClient ? toLocalInput(baseDate) : "");
+  const [localEnded, setLocalEnded] = useState<string | null>(null);
+  const endedInput = localEnded ?? (isClient && initial.endedAt ? toLocalInput(new Date(initial.endedAt)) : "");
+
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
-  const template = ENTRY_TEMPLATES[form.type];
-  const isWeight = form.type === "PESO";
+
+  // Rascunho salvo no aparelho a cada 20s (não perde o texto se a página fechar ou a internet cair)
+  const draftKey = `biocell.rascunho.${patientId}.${initial.id ?? `novo.${initial.type}`}`;
+  const storedDraft = useSyncExternalStore(
+    () => () => {},
+    () => (typeof localStorage === "undefined" ? null : localStorage.getItem(draftKey)),
+    () => null
+  );
+  const [draftHandled, setDraftHandled] = useState(false);
+  const draft = !draftHandled && storedDraft ? readDraft(draftKey) : null;
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+  const dirty = useRef(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!dirty.current) return;
+      const f = formRef.current;
+      const d: Draft = { title: f.title, content: f.content, weight: f.weight, subtype: f.subtype, returnDate: f.returnDate, videoUrl: f.videoUrl, savedAt: Date.now() };
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(d));
+        dirty.current = false;
+        setLastSaved(d.savedAt);
+      } catch { /* armazenamento indisponível */ }
+    }, AUTOSAVE_MS);
+    return () => clearInterval(timer);
+  }, [draftKey]);
+
+  const type = form.type;
+  const template = ENTRY_TEMPLATES[type];
+  const titleLabel = TITLE_LABEL[type] || "Resumo";
 
   function update<K extends keyof Initial>(field: K, value: Initial[K]) {
+    dirty.current = true;
     setForm((f) => ({ ...f, [field]: value }));
   }
 
@@ -71,7 +113,7 @@ export default function EntryForm({ patientId, initial }: { patientId: string; i
     for (const f of Array.from(list)) {
       const c = await compressImage(f);
       if (c.size > MAX_ATTACHMENT_BYTES) {
-        setError(`"${f.name}" passa de ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB. Reduza o arquivo ou divida o PDF.`);
+        setError(`"${f.name}" passa de ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB. ${f.type.startsWith("video/") ? "Para vídeos maiores use o link (YouTube, Google Drive...)." : "Reduza o arquivo ou divida o PDF."}`);
         continue;
       }
       prepared.push(c);
@@ -86,15 +128,19 @@ export default function EntryForm({ patientId, initial }: { patientId: string; i
     setError("");
 
     const payload = {
-      type: form.type,
+      type,
       title: form.title,
       content: form.content,
-      weight: isWeight ? form.weight.replace(",", ".") : null,
+      weight: type === "PESO" ? form.weight : null,
+      subtype: form.subtype,
+      returnDate: form.returnDate || null,
+      endedAt: type === "INTERNACAO" && endedInput ? new Date(endedInput).toISOString() : null,
+      videoUrl: form.videoUrl,
       occurredAt: new Date(localDate ?? toLocalInput(baseDate)).toISOString(),
     };
 
-    const res = await fetch(isEdit ? `/api/clinical-entries/${initial.id}` : `/api/patients/${patientId}/clinical`, {
-      method: isEdit ? "PATCH" : "POST",
+    const res = await fetch(entryId ? `/api/clinical-entries/${entryId}` : `/api/patients/${patientId}/clinical`, {
+      method: entryId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -104,110 +150,146 @@ export default function EntryForm({ patientId, initial }: { patientId: string; i
       setSaving(false);
       return;
     }
+    const id: string = entryId ?? data.id;
+    setEntryId(id);
+    try { localStorage.removeItem(draftKey); } catch { /* ok */ }
 
-    const entryId = isEdit ? initial.id! : data.id;
     // Anexos: um por requisição; se algum falhar o registro já está salvo
-    const failed: string[] = [];
+    const failed: File[] = [];
+    const messages: string[] = [];
     for (const [i, file] of files.entries()) {
       setProgress(`Enviando anexo ${i + 1} de ${files.length}...`);
       const body = new FormData();
       body.append("file", file);
-      const up = await fetch(`/api/clinical-entries/${entryId}/attachments`, { method: "POST", body });
+      const up = await fetch(`/api/clinical-entries/${id}/attachments`, { method: "POST", body });
       if (!up.ok) {
-        const err = await up.json().catch(() => ({}));
-        failed.push(`${file.name}: ${err.error || "falha no envio"}`);
+        failed.push(file);
+        messages.push(`${file.name}: ${(await up.json().catch(() => ({}))).error || "falha no envio"}`);
       }
     }
     if (failed.length > 0) {
-      setError(`Registro salvo, mas alguns anexos falharam:\n${failed.join("\n")}`);
-      setFiles((prev) => prev.filter((f) => failed.some((m) => m.startsWith(f.name))));
+      setError(`Registro salvo, mas alguns anexos falharam (tente salvar de novo):\n${messages.join("\n")}`);
+      setFiles(failed);
       setSaving(false);
       setProgress("");
       return;
     }
 
-    router.push(`/pacientes/${patientId}/geral/${entryId}`);
+    router.push(`/pacientes/${patientId}/geral/${id}`);
     router.refresh();
   }
 
+  const fmtTime = (t: number) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {draft && (
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm">
+          <span>Há um rascunho não salvo de {new Date(draft.savedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.</span>
+          <span className="flex gap-3">
+            <button type="button" className="font-semibold underline"
+              onClick={() => {
+                setForm((f) => ({ ...f, title: draft.title, content: draft.content, weight: draft.weight, subtype: draft.subtype, returnDate: draft.returnDate, videoUrl: draft.videoUrl }));
+                setDraftHandled(true);
+              }}>
+              Recuperar
+            </button>
+            <button type="button" className="text-amber-700"
+              onClick={() => {
+                try { localStorage.removeItem(draftKey); } catch { /* ok */ }
+                setDraftHandled(true);
+              }}>
+              Descartar
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-            <select
-              value={form.type}
-              onChange={(e) => update("type", e.target.value as EntryType)}
-              disabled={isEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-600"
-            >
-              {Object.entries(ENTRY_TYPES).map(([key, t]) => (
-                <option key={key} value={key}>{t.label}</option>
-              ))}
+            <label className={label}>Tipo</label>
+            <select value={type} onChange={(e) => update("type", e.target.value as EntryType)} disabled={isEdit}
+              className={`${input} disabled:bg-gray-50 disabled:text-gray-600`}>
+              {Object.entries(ENTRY_TYPES).map(([key, t]) => <option key={key} value={key}>{t.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data e hora</label>
-            <input
-              type="datetime-local"
-              required
-              value={occurredInput}
-              onChange={(e) => setLocalDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
+            <label className={label}>{type === "INTERNACAO" ? "Entrada" : "Data e hora"}</label>
+            <input type="datetime-local" required value={occurredInput} onChange={(e) => setLocalDate(e.target.value)} className={input} />
           </div>
-        </div>
 
-        {isWeight ? (
-          <div className="sm:w-1/2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Peso (kg) *</label>
-            <input
-              required
-              inputMode="decimal"
-              value={form.weight}
-              onChange={(e) => update("weight", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              placeholder="Ex: 5,8"
-            />
+          {type === "ATENDIMENTO" && (
+            <div>
+              <label className={label}>Tipo do atendimento</label>
+              <input list="attendance-subtypes" value={form.subtype} onChange={(e) => update("subtype", e.target.value)} className={input}
+                placeholder="Ex: Aplicação CT, Retorno, C15..." />
+              <datalist id="attendance-subtypes">{ATTENDANCE_SUBTYPES.map((s) => <option key={s} value={s} />)}</datalist>
+            </div>
+          )}
+          {type === "INTERNACAO" && (
+            <div>
+              <label className={label}>Alta</label>
+              <input type="datetime-local" value={endedInput} onChange={(e) => setLocalEnded(e.target.value)} className={input} />
+              <p className="text-xs text-gray-400 mt-1">Deixe em branco enquanto o animal estiver internado.</p>
+            </div>
+          )}
+          {type === "PESO" && (
+            <div>
+              <label className={label}>Peso (kg) *</label>
+              <input required inputMode="decimal" value={form.weight} onChange={(e) => update("weight", e.target.value)} className={input} placeholder="Ex: 5,8" />
+            </div>
+          )}
+
+          <div className={type === "ATENDIMENTO" || type === "INTERNACAO" || type === "PESO" ? "" : "sm:col-span-2"}>
+            <label className={label}>{titleLabel}</label>
+            <input value={form.title} onChange={(e) => update("title", e.target.value)} maxLength={200} className={input}
+              required={type === "PATOLOGIA"}
+              list={type === "PATOLOGIA" ? "pathologies" : undefined}
+              placeholder={type === "PESO" ? "Ex: Informado pela clínica" : type === "PATOLOGIA" ? "Ex: Doença Renal Crônica" : "Ex: 3ª aplicação, Hemograma 18/09..."} />
+            {type === "PATOLOGIA" && <datalist id="pathologies">{PATHOLOGIES.map((p) => <option key={p} value={p} />)}</datalist>}
           </div>
-        ) : null}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Resumo</label>
-          <input
-            value={form.title}
-            onChange={(e) => update("title", e.target.value)}
-            maxLength={200}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            placeholder={isWeight ? "Ex: Informado pela clínica" : "Ex: Consulta de retorno, 3ª aplicação, Hemograma 18/09..."}
-          />
+          {type === "VIDEO" && (
+            <div className="sm:col-span-2">
+              <label className={label}>Link do vídeo</label>
+              <input type="url" value={form.videoUrl} onChange={(e) => update("videoUrl", e.target.value)} className={input}
+                placeholder="https://youtube.com/... ou link do Google Drive" />
+              <p className="text-xs text-gray-400 mt-1">Vídeos curtos (até 4 MB) também podem ser anexados abaixo.</p>
+            </div>
+          )}
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">{isWeight ? "Observações" : "Descrição"}</label>
+            <label className="block text-sm font-medium text-gray-700">
+              {type === "PESO" || type === "PATOLOGIA" ? "Observações" : "Descrição"}
+            </label>
             {template && !isEdit && (
-              <button
-                type="button"
-                onClick={() => update("content", form.content.trim() ? `${form.content}\n\n${template}` : template)}
-                className="text-xs text-primary hover:underline"
-              >
+              <button type="button" className="text-xs text-primary hover:underline"
+                onClick={() => update("content", form.content.trim() ? `${form.content}\n\n${template}` : template)}>
                 Inserir roteiro
               </button>
             )}
           </div>
-          <textarea
-            value={form.content}
-            onChange={(e) => update("content", e.target.value)}
-            rows={isWeight ? 3 : 14}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm leading-relaxed font-[inherit]"
-            placeholder={isWeight ? "" : "Anamnese, histórico, exame físico, achados, conduta..."}
-          />
+          <textarea value={form.content} onChange={(e) => update("content", e.target.value)}
+            rows={type === "PESO" || type === "PATOLOGIA" || type === "FOTOS" || type === "VIDEO" ? 3 : 14}
+            className={`${input} leading-relaxed font-[inherit]`}
+            placeholder={type === "ATENDIMENTO" ? "Anamnese, histórico, exame físico, achados, conduta..." : ""} />
+          <p className="text-xs text-gray-400 mt-1">
+            Rascunho salvo neste aparelho a cada 20 segundos{lastSaved ? ` · último às ${fmtTime(lastSaved)}` : ""}.
+          </p>
         </div>
 
+        {(type === "ATENDIMENTO" || type === "EXAME" || type === "INTERNACAO" || type === "VACINA") && (
+          <div className="sm:w-1/2">
+            <label className={label}>Agendar retorno</label>
+            <input type="date" value={form.returnDate} onChange={(e) => update("returnDate", e.target.value)} className={input} />
+          </div>
+        )}
+
         <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">Anexos</p>
+          <p className="text-sm font-medium text-gray-700 mb-2">{type === "FOTOS" ? "Fotos" : "Anexos"}</p>
           {initial.attachments && initial.attachments.length > 0 && (
             <ul className="mb-2 space-y-1">
               {initial.attachments.map((a) => (
@@ -230,20 +312,13 @@ export default function EntryForm({ patientId, initial }: { patientId: string; i
               ))}
             </ul>
           )}
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
-            onChange={(e) => addFiles(e.target.files)}
-            className="hidden"
-            id="attachments"
-          />
+          <input ref={fileInput} type="file" multiple id="attachments" className="hidden" onChange={(e) => addFiles(e.target.files)}
+            accept={type === "FOTOS" ? "image/*" : type === "VIDEO" ? "video/mp4,video/webm,video/quicktime" : "image/*,video/mp4,video/webm,video/quicktime,application/pdf,.doc,.docx,.xls,.xlsx,.txt"} />
           <label htmlFor="attachments"
             className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
-            <Paperclip size={14} /> Adicionar arquivos
+            <Paperclip size={14} /> {type === "FOTOS" ? "Adicionar fotos" : type === "VIDEO" ? "Anexar vídeo curto" : "Adicionar arquivos"}
           </label>
-          <p className="text-xs text-gray-400 mt-1">PDF, imagens, Word ou Excel · até 4 MB por arquivo (fotos são reduzidas automaticamente)</p>
+          <p className="text-xs text-gray-400 mt-1">PDF, imagens, vídeo curto, Word ou Excel · até 4 MB por arquivo (fotos são reduzidas automaticamente)</p>
         </div>
       </div>
 

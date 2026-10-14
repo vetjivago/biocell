@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { getGeneralRecordPatient, isEntryType } from "@/lib/clinical";
+import { getGeneralRecordPatient, isEntryType, parseEntryFields } from "@/lib/clinical";
 
 // Linha do tempo do prontuário geral (sem o conteúdo dos anexos)
 export async function GET(
@@ -39,18 +39,13 @@ export async function POST(
   const { patient } = access;
 
   const body = await request.json();
-  const { type, title, content, weight, occurredAt } = body;
+  const { type } = body;
   if (!isEntryType(type)) return Response.json({ error: "Tipo de registro inválido" }, { status: 400 });
-
-  const weightValue = weight === null || weight === undefined || weight === "" ? null : Number(weight);
-  if (type === "PESO" && (weightValue === null || !Number.isFinite(weightValue) || weightValue <= 0)) {
-    return Response.json({ error: "Informe o peso em kg" }, { status: 400 });
-  }
-  if (type !== "PESO" && !String(content || "").trim() && !String(title || "").trim()) {
-    return Response.json({ error: "Preencha o resumo ou o texto do registro" }, { status: 400 });
-  }
-  const when = occurredAt ? new Date(occurredAt) : new Date();
-  if (Number.isNaN(when.getTime())) return Response.json({ error: "Data inválida" }, { status: 400 });
+  const parsed = parseEntryFields(type, body);
+  if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
+  const fields = parsed.data;
+  const when = fields.occurredAt!;
+  const weightValue = fields.weight ?? null;
 
   const entry = await prisma.$transaction(async (tx) => {
     const created = await tx.clinicalEntry.create({
@@ -59,10 +54,8 @@ export async function POST(
         unitId: patient.unitId,
         authorId: session.id,
         type,
-        title: String(title || "").trim() || null,
-        content: String(content || ""),
-        weight: type === "PESO" ? weightValue : null,
-        occurredAt: when,
+        ...fields,
+        content: fields.content ?? "",
       },
     });
     // Peso mais recente atualiza a ficha do paciente

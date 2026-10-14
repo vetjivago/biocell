@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { canEditEntry, getGeneralRecordPatient } from "@/lib/clinical";
+import { canEditEntry, getGeneralRecordPatient, isEntryType, parseEntryFields } from "@/lib/clinical";
 
 async function loadEntry(entryId: string) {
   return prisma.clinicalEntry.findUnique({
@@ -44,20 +44,10 @@ export async function PATCH(
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
   if (!canEditEntry(session, entry)) return Response.json({ error: "Só o autor ou o gestor podem editar" }, { status: 403 });
 
-  const { title, content, weight, occurredAt } = await request.json();
-  const data: { title?: string | null; content?: string; weight?: number | null; occurredAt?: Date } = {};
-  if (title !== undefined) data.title = String(title || "").trim() || null;
-  if (content !== undefined) data.content = String(content || "");
-  if (entry.type === "PESO" && weight !== undefined) {
-    const w = Number(weight);
-    if (!Number.isFinite(w) || w <= 0) return Response.json({ error: "Informe o peso em kg" }, { status: 400 });
-    data.weight = w;
-  }
-  if (occurredAt !== undefined) {
-    const d = new Date(occurredAt);
-    if (Number.isNaN(d.getTime())) return Response.json({ error: "Data inválida" }, { status: 400 });
-    data.occurredAt = d;
-  }
+  if (!isEntryType(entry.type)) return Response.json({ error: "Tipo de registro inválido" }, { status: 400 });
+  const parsed = parseEntryFields(entry.type, await request.json(), { partial: true, current: entry });
+  if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
+  const data = parsed.data;
 
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.clinicalEntry.update({ where: { id: entryId }, data });
@@ -65,7 +55,10 @@ export async function PATCH(
       data: {
         userId: session.id, action: "UPDATE", entity: "ClinicalEntry", entityId: entryId,
         details: JSON.stringify({
-          before: { title: entry.title, content: entry.content, weight: entry.weight, occurredAt: entry.occurredAt },
+          before: {
+            title: entry.title, content: entry.content, weight: entry.weight, occurredAt: entry.occurredAt,
+            subtype: entry.subtype, returnDate: entry.returnDate, endedAt: entry.endedAt, videoUrl: entry.videoUrl,
+          },
         }),
       },
     });

@@ -41,6 +41,10 @@ export default async function EditarRegistroPage({
           title: entry.title || "",
           content: entry.content,
           weight: entry.weight?.toString().replace(".", ",") || "",
+          subtype: entry.subtype || "",
+          returnDate: entry.returnDate ? entry.returnDate.toISOString().slice(0, 10) : "",
+          endedAt: entry.endedAt ? entry.endedAt.toISOString() : null,
+          videoUrl: entry.videoUrl || "",
           occurredAt: entry.occurredAt.toISOString(),
           attachments: entry.attachments,
         }}

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { canAccessUnit } from "@/lib/patient-search";
+import { parsePatientFields } from "@/lib/patient-fields";
 
 export async function GET(
   _request: NextRequest,
@@ -88,4 +89,31 @@ export async function GET(
       professionalName: r.professional.name,
     })),
   });
+}
+
+// Edita o cadastro do paciente (dados do animal e do tutor)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+
+  const patient = await prisma.patient.findUnique({ where: { id } });
+  if (!patient) return Response.json({ error: "Paciente não encontrado" }, { status: 404 });
+  if (!canAccessUnit(session, patient.unitId)) return Response.json({ error: "Sem permissão" }, { status: 403 });
+
+  const parsed = parsePatientFields(await request.json(), { partial: true });
+  if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.patient.update({ where: { id }, data: parsed.data });
+    const before = Object.fromEntries(Object.keys(parsed.data).map((k) => [k, (patient as Record<string, unknown>)[k]]));
+    await tx.auditLog.create({
+      data: { userId: session.id, action: "UPDATE", entity: "Patient", entityId: id, details: JSON.stringify({ before }) },
+    });
+    return u;
+  });
+  return Response.json(updated);
 }

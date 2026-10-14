@@ -38,6 +38,7 @@ export default async function RegistroPage({
   const t = isEntryType(entry.type) ? ENTRY_TYPES[entry.type] : { label: entry.type, color: "#6b7280" };
   const edited = entry.updatedAt.getTime() - entry.createdAt.getTime() > 60_000;
   const images = entry.attachments.filter((a) => /^image\/(png|jpeg|gif|webp)$/.test(a.mimeType));
+  const videos = entry.attachments.filter((a) => a.mimeType.startsWith("video/"));
 
   return (
     <div className="max-w-3xl">
@@ -49,7 +50,7 @@ export default async function RegistroPage({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <p className="text-sm font-medium" style={{ color: t.color }}>{t.label}</p>
-            <h1 className="text-xl font-bold text-gray-900">{entry.title || t.label}</h1>
+            <h1 className="text-xl font-bold text-gray-900">{entry.title || entry.subtype || t.label}</h1>
             <p className="text-sm text-gray-500 mt-1">
               {fmt(entry.occurredAt)} · {entry.author.name}
               {edited && ` · editado em ${fmt(entry.updatedAt)}`}
@@ -70,6 +71,27 @@ export default async function RegistroPage({
           Paciente: <span className="text-gray-800 font-medium">{p.name}</span> · {p.species}
           {p.breed ? ` · ${p.breed}` : ""} · Tutor: {p.ownerName} · {p.unit.name}
         </div>
+
+        {(entry.subtype || entry.returnDate || entry.type === "INTERNACAO" || entry.videoUrl) && (
+          <div className="flex flex-wrap gap-2 mb-4 text-sm">
+            {entry.subtype && <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">{entry.subtype}</span>}
+            {entry.type === "INTERNACAO" && (
+              <span className="px-2 py-1 rounded bg-red-50 text-red-700 font-medium">
+                {entry.endedAt ? `Internação até ${fmt(entry.endedAt)}` : "Internado"}
+              </span>
+            )}
+            {entry.returnDate && (
+              <span className="px-2 py-1 rounded bg-amber-50 text-amber-800 font-medium">
+                Retorno agendado: {entry.returnDate.toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+              </span>
+            )}
+            {entry.videoUrl && (
+              <a href={entry.videoUrl} target="_blank" rel="noopener noreferrer" className="px-2 py-1 rounded bg-green-50 text-green-800 font-medium hover:underline">
+                Abrir vídeo ↗
+              </a>
+            )}
+          </div>
+        )}
 
         {entry.type === "PESO" && (
           <p className="text-3xl font-bold text-gray-900 mb-4">{entry.weight?.toLocaleString("pt-BR")} kg</p>
@@ -95,6 +117,9 @@ export default async function RegistroPage({
                 ))}
               </div>
             )}
+            {videos.map((a) => (
+              <video key={a.id} src={`/api/clinical-attachments/${a.id}`} controls preload="metadata" className="w-full max-h-96 rounded-lg mb-3 bg-black" />
+            ))}
             <ul className="space-y-1">
               {entry.attachments.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-3 text-sm py-1.5">
