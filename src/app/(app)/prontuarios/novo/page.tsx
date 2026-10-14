@@ -2,11 +2,32 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { normalizeSpecies } from "@/lib/species";
 
 interface Unit { id: string; name: string; }
-interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; readonly?: boolean; }
+interface AppItem { category: Category; batchId: string; quantity: string; }
+interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; items: AppItem[]; itemsInit?: boolean; readonly?: boolean; }
+interface StockItem { batchId: string; batchNumber: string; productName: string; category: string; balance: number; expirationDate: string | null; species: string | null; }
+
+type Category = "CELULAS" | "SORO" | "MEIO";
+
+function lotsFor(stock: StockItem[], category: Category, patientSpecies: string) {
+  const lots = stock.filter((s) => s.category === category);
+  if (category !== "CELULAS") return lots;
+  const patientKind = normalizeSpecies(patientSpecies);
+  if (!patientKind) return lots;
+  return lots.filter((l) => {
+    const kind = normalizeSpecies(l.species) || normalizeSpecies(l.productName);
+    return !kind || kind === patientKind;
+  });
+}
+const ITEM_CATEGORIES: { key: Category; label: string; unit: string }[] = [
+  { key: "CELULAS", label: "Células", unit: "palhetas" },
+  { key: "SORO", label: "Soro", unit: "un." },
+  { key: "MEIO", label: "Meio", unit: "un." },
+];
 interface ThawEntry { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string; readonly?: boolean; }
 
 const PATHOLOGIES = [
@@ -48,8 +69,9 @@ function NovoProntuarioForm() {
     pathology: "", cellQuantity: "", applicationRoute: "",
     donors: "", serumCollected: false,
   });
+  const [stock, setStock] = useState<StockItem[] | null>(null);
   const [applications, setApplications] = useState<AppEntry[]>([
-    { number: 1, date: "", cells: "", serum: "", medium: "" },
+    { number: 1, date: "", cells: "", serum: "", medium: "", items: [] },
   ]);
   const [thawings, setThawings] = useState<ThawEntry[]>([
     { number: 1, thawedStraws: "", thawedMeio: "", thawedSoro: "", retrievalLocation: "" },
@@ -93,12 +115,12 @@ function NovoProntuarioForm() {
         });
 
         const prevApps: AppEntry[] = (data.previousApplications || []).map((a: AppEntry) => ({
-          ...a, readonly: true,
+          ...a, items: [], readonly: true,
         }));
         const nextAppNum = prevApps.length > 0 ? Math.max(...prevApps.map((a: AppEntry) => a.number)) + 1 : 1;
         setApplications([
           ...prevApps,
-          { number: nextAppNum, date: "", cells: "", serum: "", medium: "" },
+          { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: [] },
         ]);
 
         const prevThaws: ThawEntry[] = (data.previousThawings || []).map((t: ThawEntry) => ({
@@ -118,6 +140,63 @@ function NovoProntuarioForm() {
       });
   }, [patientId]);
 
+  // Lotes disponíveis no estoque da unidade do paciente (abastecidos pela matriz)
+  useEffect(() => {
+    if (!form.unitId) return;
+    fetch(`/api/inventory/stock?unitId=${form.unitId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: StockItem[]) => setStock(data))
+      .catch(() => setStock([]));
+  }, [form.unitId]);
+
+  // Cada nova aplicação começa com uma linha por categoria; pré-seleciona o lote quando há só um
+  useEffect(() => {
+    if (!stock || !applications.some((a) => !a.readonly && !a.itemsInit)) return;
+    setApplications((apps) => apps.map((a) => (a.readonly || a.itemsInit ? a : { ...a, items: defaultItems(stock), itemsInit: true })));
+  }, [stock, applications]);
+
+  function defaultItems(list: StockItem[], patientSpecies = form.patientSpecies): AppItem[] {
+    return ITEM_CATEGORIES.map((c) => {
+      const lots = lotsFor(list, c.key, patientSpecies);
+      return { category: c.key, batchId: lots.length === 1 ? lots[0].batchId : "", quantity: "" };
+    });
+  }
+
+  function newApplication(number: number): AppEntry {
+    return { number, date: "", cells: "", serum: "", medium: "", items: [] };
+  }
+
+  function updateItem(appIdx: number, itemIdx: number, field: "batchId" | "quantity", value: string) {
+    setApplications((apps) => apps.map((a, j) => j !== appIdx ? a : {
+      ...a, items: a.items.map((it, k) => k === itemIdx ? { ...it, [field]: value } : it),
+    }));
+  }
+
+  function addItem(appIdx: number, category: Category) {
+    setApplications((apps) => apps.map((a, j) => {
+      if (j !== appIdx) return a;
+      const lastIdx = a.items.map((it) => it.category).lastIndexOf(category);
+      const items = [...a.items];
+      items.splice(lastIdx === -1 ? items.length : lastIdx + 1, 0, { category, batchId: "", quantity: "" });
+      return { ...a, items };
+    }));
+  }
+
+  function removeItem(appIdx: number, itemIdx: number) {
+    setApplications((apps) => apps.map((a, j) => j !== appIdx ? a : {
+      ...a, items: a.items.filter((_, k) => k !== itemIdx),
+    }));
+  }
+
+  // Saldo do lote descontando o que já foi alocado nas outras linhas deste prontuário
+  function remainingFor(batchId: string, exclude: { appIdx: number; itemIdx: number }) {
+    const lot = stock?.find((s) => s.batchId === batchId);
+    if (!lot) return 0;
+    const allocated = applications.reduce((sum, a, j) => sum + (a.readonly ? 0 : a.items.reduce((s2, it, k) =>
+      s2 + (it.batchId === batchId && !(j === exclude.appIdx && k === exclude.itemIdx) ? parseInt(it.quantity) || 0 : 0), 0)), 0);
+    return lot.balance - allocated;
+  }
+
   function update(field: string, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
   }
@@ -134,7 +213,24 @@ function NovoProntuarioForm() {
     e.preventDefault();
     setLoading(true);
 
-    const newApps = applications.filter((a) => !a.readonly && (a.date || a.cells));
+    for (const a of applications.filter((x) => !x.readonly)) {
+      if (a.items.some((it) => Boolean(it.batchId) !== (parseInt(it.quantity) > 0))) {
+        setError(`${a.number}ª aplicação: informe lote e quantidade em cada linha (ou remova a linha)`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const newApps = applications
+      .filter((a) => !a.readonly)
+      .map((a) => ({
+        number: a.number,
+        date: a.date,
+        items: a.items
+          .filter((it) => it.batchId && parseInt(it.quantity) > 0)
+          .map((it) => ({ batchId: it.batchId, category: it.category, quantity: parseInt(it.quantity) })),
+      }))
+      .filter((a) => a.date || a.items.length > 0);
     const newThaws = thawings
       .filter((t) => !t.readonly && (t.thawedStraws || t.thawedMeio || t.thawedSoro || t.retrievalLocation))
       .map((t) => ({
@@ -168,6 +264,23 @@ function NovoProntuarioForm() {
     setLoading(false);
   }
 
+  if (!patientId) {
+    return (
+      <div className="max-w-3xl">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Selecione um paciente</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Novos prontuários são abertos a partir da aba Pacientes: escolha um paciente já cadastrado
+            ou cadastre um novo paciente.
+          </p>
+          <Link href="/pacientes" className="inline-block bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+            Ir para Pacientes
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (loadingPatient) {
     return (
       <div className="max-w-3xl">
@@ -185,7 +298,7 @@ function NovoProntuarioForm() {
 
   return (
     <div className="max-w-3xl">
-      <Link href={patientId ? `/pacientes/${patientId}` : "/prontuarios"} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4">
+      <Link href={`/pacientes/${patientId}`} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-4">
         <ArrowLeft size={16} /> Voltar
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
@@ -335,7 +448,7 @@ function NovoProntuarioForm() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Aplicações</h2>
             {applications.length < 6 && (
-              <button type="button" onClick={() => setApplications((a) => [...a, { number: maxAppNum + 1, date: "", cells: "", serum: "", medium: "" }])}
+              <button type="button" onClick={() => setApplications((a) => [...a, newApplication(maxAppNum + 1)])}
                 className="text-sm text-primary hover:underline">+ Adicionar</button>
             )}
           </div>
@@ -364,28 +477,85 @@ function NovoProntuarioForm() {
             const idx = applications.indexOf(app);
             return (
               <div key={idx} className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-2">{app.number}ª Aplicação</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Data</label>
-                    <input type="date" value={app.date} onChange={(e) => updateApp(idx, "date", e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Células</label>
-                    <input value={app.cells} onChange={(e) => updateApp(idx, "cells", e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Soro</label>
-                    <input value={app.serum} onChange={(e) => updateApp(idx, "serum", e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Meio</label>
-                    <input value={app.medium} onChange={(e) => updateApp(idx, "medium", e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm" />
-                  </div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-700">{app.number}ª Aplicação</p>
+                  {editableApps.length > 1 && (
+                    <button type="button" onClick={() => setApplications((apps) => apps.filter((_, j) => j !== idx))}
+                      className="text-xs text-gray-400 hover:text-red-500">Remover</button>
+                  )}
+                </div>
+                <div className="mb-3 sm:w-1/2">
+                  <label className="block text-xs text-gray-500 mb-1">Data</label>
+                  <input type="date" value={app.date} onChange={(e) => updateApp(idx, "date", e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                </div>
+
+                <div className="space-y-3">
+                  {ITEM_CATEGORIES.map((cat) => {
+                    const lots = lotsFor(stock || [], cat.key, form.patientSpecies);
+                    const rows = app.items.map((it, k) => ({ it, k })).filter(({ it }) => it.category === cat.key);
+                    return (
+                      <div key={cat.key} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{cat.label}</p>
+                          {lots.length > 0 && (
+                            <button type="button" onClick={() => addItem(idx, cat.key)}
+                              className="flex items-center gap-1 text-xs text-primary hover:underline">
+                              <Plus size={12} /> {rows.length === 0 ? "Adicionar lote" : "Outro lote"}
+                            </button>
+                          )}
+                        </div>
+                        {stock === null ? (
+                          <p className="text-xs text-gray-400">Carregando lotes...</p>
+                        ) : lots.length === 0 ? (
+                          <p className="text-xs text-amber-600">
+                            Nenhum lote de {cat.label.toLowerCase()} no estoque da unidade. Solicite abastecimento à matriz.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {rows.length === 0 && (
+                              <p className="text-xs text-gray-400">Não utilizado nesta aplicação.</p>
+                            )}
+                            {rows.map(({ it, k }) => {
+                              const usedHere = rows.filter((r) => r.k !== k).map((r) => r.it.batchId);
+                              const remaining = it.batchId ? remainingFor(it.batchId, { appIdx: idx, itemIdx: k }) : 0;
+                              const over = Boolean(it.batchId) && (parseInt(it.quantity) || 0) > remaining;
+                              return (
+                                <div key={k} className="flex flex-wrap sm:flex-nowrap gap-2 items-start pb-2 sm:pb-0 border-b last:border-b-0 sm:border-b-0 border-gray-100">
+                                  <select value={it.batchId} onChange={(e) => updateItem(idx, k, "batchId", e.target.value)}
+                                    aria-label={`Lote de ${cat.label.toLowerCase()}`}
+                                    className="w-full sm:w-auto sm:flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded text-sm bg-white">
+                                    <option value="">Selecione o lote...</option>
+                                    {lots.filter((l) => l.batchId === it.batchId || !usedHere.includes(l.batchId)).map((l) => (
+                                      <option key={l.batchId} value={l.batchId}>
+                                        Lote {l.batchNumber} – {l.productName} ({remainingFor(l.batchId, { appIdx: idx, itemIdx: k })} disp.)
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <div className="flex-1 sm:flex-none sm:w-24">
+                                    <input type="number" inputMode="numeric" min="1" value={it.quantity}
+                                      onChange={(e) => updateItem(idx, k, "quantity", e.target.value)}
+                                      className={`w-full px-2 py-2 border rounded text-sm ${over ? "border-red-400" : "border-gray-300"}`}
+                                      placeholder={cat.unit} aria-label={`Quantidade de ${cat.label.toLowerCase()} (${cat.unit})`} />
+                                    {over && <p className="text-[11px] text-red-500 mt-0.5">Máx. {remaining}</p>}
+                                  </div>
+                                  <button type="button" onClick={() => removeItem(idx, k)} aria-label="Remover lote"
+                                    className="p-2 text-gray-400 hover:text-red-500">
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                            {rows.length > 1 && (
+                              <p className="text-xs text-gray-500">
+                                Total: {rows.reduce((sum, r) => sum + (parseInt(r.it.quantity) || 0), 0)} {cat.unit}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

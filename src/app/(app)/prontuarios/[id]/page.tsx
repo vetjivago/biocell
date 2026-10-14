@@ -21,7 +21,10 @@ export default async function ProntuarioDetailPage({
       patient: true,
       unit: true,
       professional: true,
-      applications: { orderBy: { number: "asc" } },
+      applications: {
+        orderBy: { number: "asc" },
+        include: { items: { include: { batch: { include: { product: { select: { name: true } } } } } } },
+      },
       thawings: { orderBy: { number: "asc" } },
       procedures: { orderBy: { date: "desc" } },
       inventoryTransactions: {
@@ -39,6 +42,15 @@ export default async function ProntuarioDetailPage({
     CANCELLED: { label: "Cancelado", cls: "bg-gray-100 text-gray-800" },
   };
   const st = statusConfig[record.status] || statusConfig.OPEN;
+  const categoryLabel: Record<string, string> = { CELULAS: "Células", SORO: "Soro", MEIO: "Meio" };
+
+  // Lotes escolhidos nas aplicações, somados por lote, para pré-preencher a baixa
+  const plannedMap = new Map<string, { batchId: string; category: string; quantity: number }>();
+  for (const it of record.applications.flatMap((a) => a.items)) {
+    const prev = plannedMap.get(it.batchId);
+    plannedMap.set(it.batchId, { batchId: it.batchId, category: it.category, quantity: (prev?.quantity || 0) + it.quantity });
+  }
+  const plannedItems = [...plannedMap.values()];
 
   return (
     <div className="max-w-4xl">
@@ -87,12 +99,30 @@ export default async function ProntuarioDetailPage({
           <h2 className="font-semibold text-gray-900 mb-3">Aplicações</h2>
           <div className="space-y-2">
             {record.applications.map((a) => (
-              <div key={a.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg text-sm">
-                <span className="font-medium text-gray-700">{a.number}ª</span>
-                <span className="text-gray-600">{a.date ? new Date(a.date).toLocaleDateString("pt-BR") : "–"}</span>
-                <span className="text-gray-600">Células: {a.cells || "–"}</span>
-                <span className="text-gray-600">Soro: {a.serum || "–"}</span>
-                <span className="text-gray-600">Meio: {a.medium || "–"}</span>
+              <div key={a.id} className="p-3 bg-gray-50 rounded-lg text-sm">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span className="font-medium text-gray-700">{a.number}ª</span>
+                  <span className="text-gray-600">{a.date ? new Date(a.date).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "–"}</span>
+                  {a.items.length === 0 && (
+                    <>
+                      <span className="text-gray-600">Células: {a.cells || "–"}</span>
+                      <span className="text-gray-600">Soro: {a.serum || "–"}</span>
+                      <span className="text-gray-600">Meio: {a.medium || "–"}</span>
+                    </>
+                  )}
+                </div>
+                {a.items.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {a.items.map((it) => (
+                      <li key={it.id} className="flex flex-wrap gap-x-2 text-gray-600">
+                        <span className="text-xs font-semibold uppercase text-gray-500 w-16">{categoryLabel[it.category] || it.category}</span>
+                        <span className="font-medium text-gray-800">{it.quantity}</span>
+                        <span>{it.batch.product.name}</span>
+                        <span className="text-gray-400">Lote {it.batch.batchNumber}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>
@@ -144,6 +174,7 @@ export default async function ProntuarioDetailPage({
           cellQuantity={record.cellQuantity}
           meioQuantity={record.thawings.reduce((sum, t) => sum + (t.thawedMeio || 0), 0) || null}
           soroQuantity={record.thawings.reduce((sum, t) => sum + (t.thawedSoro || 0), 0) || null}
+          plannedItems={plannedItems}
         />
       )}
     </div>

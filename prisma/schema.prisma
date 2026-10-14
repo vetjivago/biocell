@@ -145,7 +145,23 @@ model Application {
   medium          String?
   notes           String?
 
+  items           ApplicationItem[]
+
   @@index([medicalRecordId])
+}
+
+// Lotes usados em cada aplicação (permite misturar lotes na mesma aplicação)
+model ApplicationItem {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  batchId       String
+  batch         CellBatch   @relation(fields: [batchId], references: [id])
+  category      String
+  quantity      Int
+
+  @@index([applicationId])
+  @@index([batchId])
 }
 
 model Thawing {
@@ -203,6 +219,7 @@ model CellBatch {
 
   inventoryTransactions InventoryTransaction[]
   shipmentItems         ShipmentItem[]
+  applicationItems      ApplicationItem[]
 
   @@index([productId])
 }

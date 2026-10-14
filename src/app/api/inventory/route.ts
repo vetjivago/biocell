@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { normalizeSpecies } from "@/lib/species";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -51,7 +52,11 @@ export async function POST(request: NextRequest) {
     });
     if (!product) {
       product = await prisma.cellProduct.create({
-        data: { name: productName, category: productCategory || "CELULAS" },
+        data: {
+          name: productName,
+          category: productCategory || "CELULAS",
+          species: (productCategory || "CELULAS") === "CELULAS" ? normalizeSpecies(productName) : null,
+        },
       });
     }
 

@@ -11,7 +11,7 @@ export default function NovoPacientePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    name: "", species: "Cão", breed: "", weight: "",
+    name: "", species: "Canino", breed: "", weight: "",
     ownerName: "", ownerPhone: "", ownerEmail: "",
     veterinarian: "", clinic: "", unitId: "",
   });
@@ -63,8 +63,8 @@ export default function NovoPacientePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Espécie *</label>
             <select value={form.species} onChange={(e) => update("species", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-              <option>Cão</option>
-              <option>Gato</option>
+              <option>Canino</option>
+              <option>Felino</option>
               <option>Equino</option>
             </select>
           </div>

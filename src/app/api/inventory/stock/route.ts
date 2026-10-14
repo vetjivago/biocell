@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
   const unitId = searchParams.get("unitId");
 
   const isAdmin = session.role === "ADMIN";
+  if (unitId && !isAdmin && !session.unitIds.includes(unitId)) {
+    return Response.json([], { status: 403 });
+  }
   const unitFilter = unitId
     ? { unitId }
     : isAdmin ? {} : { unitId: { in: session.unitIds } };

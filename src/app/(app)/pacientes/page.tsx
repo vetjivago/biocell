@@ -1,21 +1,40 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, FilePlus } from "lucide-react";
+
+const SEARCH_FIELDS = {
+  all: { label: "Todos os campos", placeholder: "Buscar por animal, responsável, veterinário, clínica..." },
+  name: { label: "Animal", placeholder: "Buscar por nome do animal..." },
+  ownerName: { label: "Responsável", placeholder: "Buscar por nome do responsável (tutor)..." },
+  ownerPhone: { label: "Telefone", placeholder: "Buscar por telefone do responsável..." },
+  veterinarian: { label: "Veterinário", placeholder: "Buscar por veterinário..." },
+  clinic: { label: "Clínica", placeholder: "Buscar por clínica..." },
+  breed: { label: "Raça", placeholder: "Buscar por raça..." },
+} as const;
+
+type SearchField = keyof typeof SEARCH_FIELDS;
+const TEXT_FIELDS = ["name", "ownerName", "ownerPhone", "veterinarian", "clinic", "breed"] as const;
 
 export default async function PacientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; campo?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { q } = await searchParams;
+  const { q: rawQ, campo } = await searchParams;
+  const q = rawQ?.trim();
+  const field: SearchField = campo && campo in SEARCH_FIELDS ? (campo as SearchField) : "all";
 
   const isAdmin = session.role === "ADMIN";
   const where = {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
-    ...(q ? { name: { contains: q, mode: "insensitive" as const } } : {}),
+    ...(q
+      ? field === "all"
+        ? { OR: TEXT_FIELDS.map((f) => ({ [f]: { contains: q, mode: "insensitive" as const } })) }
+        : { [field]: { contains: q, mode: "insensitive" as const } }
+      : {}),
   };
 
   const patients = await prisma.patient.findMany({
@@ -41,16 +60,32 @@ export default async function PacientesPage({
         </Link>
       </div>
 
-      <form className="mb-6">
-        <div className="relative">
+      <form className="mb-6 flex flex-col sm:flex-row gap-2">
+        <select
+          name="campo"
+          defaultValue={field}
+          aria-label="Campo de busca"
+          className="sm:w-48 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm"
+        >
+          {Object.entries(SEARCH_FIELDS).map(([key, { label }]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             name="q"
             defaultValue={q}
-            placeholder="Buscar por nome do animal..."
+            placeholder={SEARCH_FIELDS[field].placeholder}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm"
           />
         </div>
+        <button
+          type="submit"
+          className="px-4 py-2.5 bg-primary hover:bg-primary-light text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          Buscar
+        </button>
       </form>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -63,6 +98,7 @@ export default async function PacientesPage({
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Prontuários</th>
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Peso</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -78,11 +114,19 @@ export default async function PacientesPage({
                 <td className="px-4 py-3 text-sm text-gray-600">{p.unit.name}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{p._count.medicalRecords}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{p.weight ? `${p.weight} kg` : "–"}</td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={`/prontuarios/novo?patientId=${p.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                  >
+                    <FilePlus size={14} /> Novo prontuário
+                  </Link>
+                </td>
               </tr>
             ))}
             {patients.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
                   Nenhum paciente encontrado
                 </td>
               </tr>

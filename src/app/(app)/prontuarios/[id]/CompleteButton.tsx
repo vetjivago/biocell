@@ -35,12 +35,14 @@ export default function CompleteButton({
   cellQuantity,
   meioQuantity,
   soroQuantity,
+  plannedItems = [],
 }: {
   recordId: string;
   unitId: string;
   cellQuantity: string | null;
   meioQuantity?: number | null;
   soroQuantity?: number | null;
+  plannedItems?: { batchId: string; category: string; quantity: number }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -62,6 +64,17 @@ export default function CompleteButton({
           const celulas = data.filter((s) => s.category === "CELULAS");
           const meio = data.filter((s) => s.category === "MEIO");
           const soro = data.filter((s) => s.category === "SORO");
+          // Lotes já escolhidos nas aplicações do prontuário têm prioridade
+          if (plannedItems.length > 0) {
+            const fromPlan = (cat: string) => {
+              const rows = plannedItems
+                .filter((p) => p.category === cat)
+                .map((p) => ({ batchId: p.batchId, quantity: p.quantity.toString() }));
+              return rows.length > 0 ? rows : [{ batchId: "", quantity: "" }];
+            };
+            setItems({ CELULAS: fromPlan("CELULAS"), MEIO: fromPlan("MEIO"), SORO: fromPlan("SORO") });
+            return;
+          }
           setItems({
             CELULAS: [{
               batchId: celulas.length === 1 ? celulas[0].batchId : "",
@@ -78,7 +91,7 @@ export default function CompleteButton({
           });
         });
     }
-  }, [open, unitId, cellQuantity, meioQuantity, soroQuantity]);
+  }, [open, unitId, cellQuantity, meioQuantity, soroQuantity, plannedItems]);
 
   function updateRow(cat: string, index: number, field: "batchId" | "quantity", value: string) {
     setItems((prev) => ({

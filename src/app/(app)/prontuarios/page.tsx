@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
-import { Plus } from "lucide-react";
 
 export default async function ProntuariosPage() {
   const session = await getSession();
@@ -34,11 +33,10 @@ export default async function ProntuariosPage() {
           <p className="text-sm text-gray-500 mt-1">{records.length} prontuários</p>
         </div>
         <Link
-          href="/prontuarios/novo"
-          className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          href="/pacientes"
+          className="text-sm text-primary hover:underline"
         >
-          <Plus size={16} />
-          Novo Prontuário
+          Para abrir um prontuário, acesse Pacientes →
         </Link>
       </div>
 
