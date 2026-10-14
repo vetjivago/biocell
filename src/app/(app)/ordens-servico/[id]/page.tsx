@@ -61,7 +61,8 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 print:shadow-none print:border-0 print:p-0">
         {/* Cabeçalho (igual à OS impressa) */}
         <div className="flex items-start justify-between gap-4 border border-gray-200 rounded p-4">
-          <p className="text-lg font-semibold text-primary">bio cell</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/logo.svg" alt="BIO CELL by VETNIL" className="h-16 w-auto" />
           <div className="text-right text-xs text-gray-600">
             <p className="text-sm font-bold text-gray-800">BIO CELL</p>
             <p>{order.unit.name}</p>

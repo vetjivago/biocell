@@ -3,15 +3,15 @@ import type { MetadataRoute } from "next";
 // App instalável (PWA): "Adicionar à tela inicial" no iPhone/Android, sem loja e sem custo
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Bio Cell – Prontuário e Estoque",
-    short_name: "Bio Cell",
+    name: "BIO CELL – Prontuário e Estoque",
+    short_name: "BIO CELL",
     description: "Prontuário de células-tronco, pacientes e estoque",
     start_url: "/pacientes",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
     background_color: "#f5f7f5",
-    theme_color: "#1e5a28",
+    theme_color: "#005847",
     lang: "pt-BR",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

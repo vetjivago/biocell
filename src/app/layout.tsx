@@ -13,15 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bio Cell – Prontuário e Estoque",
+  title: "BIO CELL – Prontuário e Estoque",
   description: "Sistema de prontuário eletrônico e controle de estoque de células-tronco",
-  applicationName: "Bio Cell",
+  applicationName: "BIO CELL",
   // iPhone: abre em tela cheia quando adicionado à tela inicial
-  appleWebApp: { capable: true, title: "Bio Cell", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "BIO CELL", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1e5a28",
+  themeColor: "#005847",
   width: "device-width",
   initialScale: 1,
 };

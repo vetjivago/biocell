@@ -26,7 +26,7 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
   CANCELLED: { label: "Cancelado", cls: "bg-gray-100 text-gray-700" },
 };
 
-const CT_COLOR = "#2d7a3a";
+const CT_COLOR = "#00af6b";
 
 export default async function PacienteDetailPage({
   params,

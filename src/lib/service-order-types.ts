@@ -39,7 +39,7 @@ export function parseChecklist(raw: string): Partial<Record<ChecklistKey, boolea
   }
 }
 
-// Nº de série no formato usado pela Bio Cell: 02.078.26 (prefixo.sequência.ano)
+// Nº de série no formato usado pela BIO CELL: 02.078.26 (prefixo.sequência.ano)
 export function nextSerial(lastSerials: string[], now = new Date()) {
   const yy = String(now.getFullYear()).slice(-2);
   let prefix = "02";
