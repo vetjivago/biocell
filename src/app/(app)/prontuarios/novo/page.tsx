@@ -48,6 +48,7 @@ function NovoProntuarioForm() {
   const osAppId = searchParams.get("osApp");
   const [osApp, setOsApp] = useState<{
     id: string; number: number; status: string; medicalRecordId: string | null; veterinarian: string | null; technicalNotes: string | null;
+    applicationRoute: string | null; cellQuantity: string | null; preparation: string | null;
     serviceOrder: { id: string; serialNumber: string; patientId: string; disease: string | null };
   } | null>(null);
 
@@ -111,8 +112,9 @@ function NovoProntuarioForm() {
           clinic: p.clinic || "",
           unitId: p.unitId,
           pathology,
-          cellQuantity: "",
-          applicationRoute: lr?.applicationRoute || "",
+          // Via e quantidade informadas na OS valem para esta aplicação
+          cellQuantity: (os && !os.error && os.cellQuantity) || "",
+          applicationRoute: (os && !os.error && os.applicationRoute) || lr?.applicationRoute || "",
           donors: lr?.donors || "",
           serumCollected: lr?.serumCollected || false,
         });
@@ -307,6 +309,10 @@ function NovoProntuarioForm() {
         <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm mb-4">
           Preenchendo a partir da <Link href={`/ordens-servico/${osApp.serviceOrder.id}`} className="font-semibold underline">OS nº {osApp.serviceOrder.serialNumber}</Link> – {osApp.number}ª aplicação
           {osApp.veterinarian ? ` · Veterinário: ${osApp.veterinarian}` : ""}
+          {(osApp.applicationRoute || osApp.cellQuantity) && (
+            <span className="block mt-1"><strong>Via:</strong> {osApp.applicationRoute || "–"} · <strong>Quantidade de células:</strong> {osApp.cellQuantity || "–"}</span>
+          )}
+          {osApp.preparation ? <span className="block mt-1 whitespace-pre-line"><strong>Forma de preparo:</strong> {osApp.preparation}</span> : null}
           {osApp.technicalNotes ? <span className="block mt-1 whitespace-pre-line">Observações técnicas: {osApp.technicalNotes}</span> : null}
           {osApp.medicalRecordId ? <span className="block mt-1 font-semibold">Esta aplicação já tem prontuário preenchido.</span> : null}
         </div>

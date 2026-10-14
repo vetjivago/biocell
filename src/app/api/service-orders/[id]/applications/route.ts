@@ -32,6 +32,9 @@ export async function POST(
         veterinarian: optText(body.veterinarian, 200),
         financial: optText(body.financial, 500),
         technicalNotes: optText(body.technicalNotes),
+        applicationRoute: optText(body.applicationRoute, 200),
+        cellQuantity: optText(body.cellQuantity, 100),
+        preparation: optText(body.preparation),
       },
     });
     await tx.auditLog.create({

@@ -446,6 +446,10 @@ model ServiceOrderApplication {
   veterinarian    String?
   financial       String?
   technicalNotes  String?
+  // Orientações para quem prepara as células
+  applicationRoute String?
+  cellQuantity     String?
+  preparation      String?
   status          String         @default("OPEN")
   medicalRecordId String?        @unique
   medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])

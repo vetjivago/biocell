@@ -2,7 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
+import { canEditRecord } from "@/lib/record-applications";
+import DeleteRecordButton from "./DeleteRecordButton";
 import CompleteButton from "./CompleteButton";
 
 export default async function ProntuarioDetailPage({
@@ -35,6 +37,9 @@ export default async function ProntuarioDetailPage({
   });
 
   if (!record) notFound();
+  if (session.role !== "ADMIN" && !session.unitIds.includes(record.unitId)) notFound();
+  const canEdit = canEditRecord(session, record);
+  const deletable = record.status !== "COMPLETED" && record.inventoryTransactions.length === 0;
 
   const statusConfig: Record<string, { label: string; cls: string }> = {
     OPEN: { label: "Aberto", cls: "bg-blue-100 text-blue-800" },
@@ -71,7 +76,16 @@ export default async function ProntuarioDetailPage({
             </p>
           )}
         </div>
-        <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${st.cls}`}>{st.label}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canEdit && (
+            <Link href={`/prontuarios/${record.id}/editar`}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+              <Pencil size={14} /> Editar
+            </Link>
+          )}
+          {canEdit && deletable && <DeleteRecordButton recordId={record.id} fromServiceOrder={!!record.serviceOrderApplication} />}
+          <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${st.cls}`}>{st.label}</span>
+        </div>
       </div>
 
       {/* Dados do Animal */}

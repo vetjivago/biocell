@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PATHOLOGIES } from "@/lib/pathologies";
+import { ROUTE_OPTIONS } from "@/lib/service-order-types";
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
@@ -25,6 +26,9 @@ export default function NewOrderForm({
     veterinarian: defaults.veterinarian,
     financial: "",
     technicalNotes: "",
+    applicationRoute: "",
+    cellQuantity: "",
+    preparation: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +46,10 @@ export default function NewOrderForm({
         patientId,
         serialNumber: form.serialNumber,
         clinic: form.clinic, city: form.city, disease: form.disease, diagnosisTime: form.diagnosisTime,
-        application: { date: form.date || null, veterinarian: form.veterinarian, financial: form.financial, technicalNotes: form.technicalNotes },
+        application: {
+          date: form.date || null, veterinarian: form.veterinarian, financial: form.financial, technicalNotes: form.technicalNotes,
+          applicationRoute: form.applicationRoute, cellQuantity: form.cellQuantity, preparation: form.preparation,
+        },
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -94,6 +101,23 @@ export default function NewOrderForm({
           <div>
             <label className={label}>Tempo de diagnóstico</label>
             <input value={form.diagnosisTime} onChange={set("diagnosisTime")} className={input} placeholder="Ex: 2 anos" />
+          </div>
+          <div className="sm:col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <p className="sm:col-span-2 text-sm font-semibold text-amber-900">Para quem prepara as células</p>
+            <div>
+              <label className={label}>Via de aplicação</label>
+              <input list="os-routes" value={form.applicationRoute} onChange={set("applicationRoute")} className={input} placeholder="Ex: Intravenosa (IV)" />
+              <datalist id="os-routes">{ROUTE_OPTIONS.map((r) => <option key={r} value={r} />)}</datalist>
+            </div>
+            <div>
+              <label className={label}>Quantidade de células</label>
+              <input value={form.cellQuantity} onChange={set("cellQuantity")} className={input} placeholder="Ex: 2 palhetas (10 milhões)" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className={label}>Forma de preparo</label>
+              <textarea value={form.preparation} onChange={set("preparation")} rows={3} className={input}
+                placeholder="Ex: diluir em 10 mL de soro autólogo, seringa de 20 mL, aplicar em até 1 h" />
+            </div>
           </div>
           <div className="sm:col-span-2">
             <label className={label}>Financeiro</label>

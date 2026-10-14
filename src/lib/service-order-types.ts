@@ -52,3 +52,6 @@ export function nextSerial(lastSerials: string[], now = new Date()) {
   }
   return `${prefix}.${String(maxSeq + 1).padStart(3, "0")}.${yy}`;
 }
+
+// Sugestões de via de aplicação (pode digitar outra)
+export const ROUTE_OPTIONS = ["Intravenosa (IV)", "Intra-articular", "Subcutânea", "Intramuscular", "Intralesional", "Intratecal", "Tópica / colírio"];

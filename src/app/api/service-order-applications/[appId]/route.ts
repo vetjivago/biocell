@@ -21,6 +21,7 @@ export async function GET(
   return Response.json({
     id: app.id, number: app.number, status: app.status, medicalRecordId: app.medicalRecordId,
     veterinarian: app.veterinarian, technicalNotes: app.technicalNotes,
+    applicationRoute: app.applicationRoute, cellQuantity: app.cellQuantity, preparation: app.preparation,
     serviceOrder: app.serviceOrder,
   });
 }
@@ -49,6 +50,9 @@ export async function PATCH(
   if (body.veterinarian !== undefined) data.veterinarian = optText(body.veterinarian, 200);
   if (body.financial !== undefined) data.financial = optText(body.financial, 500);
   if (body.technicalNotes !== undefined) data.technicalNotes = optText(body.technicalNotes);
+  if (body.applicationRoute !== undefined) data.applicationRoute = optText(body.applicationRoute, 200);
+  if (body.cellQuantity !== undefined) data.cellQuantity = optText(body.cellQuantity, 100);
+  if (body.preparation !== undefined) data.preparation = optText(body.preparation);
   if (body.status !== undefined) {
     if (app.status === "DONE") return Response.json({ error: "Aplicação já concluída (prontuário preenchido)" }, { status: 400 });
     if (body.status !== "OPEN" && body.status !== "IN_PREP") return Response.json({ error: "Status inválido" }, { status: 400 });
@@ -60,7 +64,7 @@ export async function PATCH(
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "UPDATE", entity: "ServiceOrderApplication", entityId: appId,
-        details: JSON.stringify({ changed: Object.keys(data), before: { date: app.date, veterinarian: app.veterinarian, financial: app.financial, technicalNotes: app.technicalNotes, status: app.status } }),
+        details: JSON.stringify({ changed: Object.keys(data), before: { date: app.date, veterinarian: app.veterinarian, financial: app.financial, technicalNotes: app.technicalNotes, applicationRoute: app.applicationRoute, cellQuantity: app.cellQuantity, preparation: app.preparation, status: app.status } }),
       },
     });
     return u;

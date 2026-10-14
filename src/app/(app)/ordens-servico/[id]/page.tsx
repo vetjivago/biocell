@@ -97,6 +97,18 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
                 <h2 className="text-xl font-bold text-blue-700">{a.number}ª APLICAÇÃO</h2>
                 <span className={`px-2 py-1 rounded text-xs font-medium print:hidden ${as.cls}`}>{as.label}</span>
               </div>
+              {(a.applicationRoute || a.cellQuantity || a.preparation) && (
+                <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-4 break-inside-avoid">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-900 mb-2">Preparo das células</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[15px]">
+                    <p><span className="font-bold text-gray-700">VIA DE APLICAÇÃO:</span> {a.applicationRoute || "–"}</p>
+                    <p><span className="font-bold text-gray-700">QUANTIDADE DE CÉLULAS:</span> {a.cellQuantity || "–"}</p>
+                    {a.preparation && (
+                      <p className="sm:col-span-2 whitespace-pre-line"><span className="font-bold text-gray-700">FORMA DE PREPARO:</span> {a.preparation}</p>
+                    )}
+                  </div>
+                </div>
+              )}
               <Line label="Data" value={dayUTC(a.date)} />
               <Line label="Veterinário responsável" value={a.veterinarian} />
               {i === 0 && (
@@ -122,6 +134,7 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
                   app={{
                     id: a.id, number: a.number, status: a.status, date: dayInput(a.date), veterinarian: a.veterinarian || "",
                     financial: a.financial || "", technicalNotes: a.technicalNotes || "", medicalRecordId: a.medicalRecordId,
+                    applicationRoute: a.applicationRoute || "", cellQuantity: a.cellQuantity || "", preparation: a.preparation || "",
                   }}
                   header={i === 0 ? { orderId: order.id, clinic: order.clinic || "", city: order.city || "", disease: order.disease || "", diagnosisTime: order.diagnosisTime || "" } : undefined}
                 />
@@ -138,7 +151,16 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
 
       {!order.cancelled && nextNumber <= 6 && (
         <div className="mt-4">
-          <AddApplication orderId={order.id} nextNumber={nextNumber} defaultVet={order.applications.at(-1)?.veterinarian || ""} />
+          <AddApplication
+            orderId={order.id}
+            nextNumber={nextNumber}
+            defaultVet={order.applications.at(-1)?.veterinarian || ""}
+            defaultPrep={{
+              applicationRoute: order.applications.at(-1)?.applicationRoute || "",
+              cellQuantity: order.applications.at(-1)?.cellQuantity || "",
+              preparation: order.applications.at(-1)?.preparation || "",
+            }}
+          />
         </div>
       )}
     </div>

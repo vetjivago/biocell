@@ -27,7 +27,10 @@ export default async function OrdensServicoPage({
     include: {
       patient: { select: { id: true, name: true, species: true, ownerName: true } },
       unit: { select: { name: true } },
-      applications: { orderBy: { number: "asc" }, select: { number: true, status: true, date: true, veterinarian: true } },
+      applications: {
+        orderBy: { number: "asc" },
+        select: { number: true, status: true, date: true, veterinarian: true, applicationRoute: true, cellQuantity: true },
+      },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -80,6 +83,9 @@ export default async function OrdensServicoPage({
                     {pending
                       ? `${pending.number}ª${pending.date ? ` · ${pending.date.toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""}${pending.veterinarian ? ` · ${pending.veterinarian}` : ""}`
                       : `${o.applications.length} aplicação(ões) concluída(s)`}
+                    {pending && (pending.applicationRoute || pending.cellQuantity) && (
+                      <span className="block text-xs text-amber-800">{[pending.cellQuantity, pending.applicationRoute].filter(Boolean).join(" · ")}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
