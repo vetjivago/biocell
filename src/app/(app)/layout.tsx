@@ -6,6 +6,8 @@ import { serviceOrderUnitIds } from "@/lib/service-orders";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  // Senha provisória: obriga a trocar antes de usar o sistema
+  if (session.mustChangePassword) redirect("/trocar-senha");
   const hasServiceOrders = (await serviceOrderUnitIds(session)).length > 0;
 
   return (

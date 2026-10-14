@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
 
   // App mobile recebe o token no corpo (guardado no SecureStore do aparelho)
   if (isMobile) {
+    if (user.mustChangePassword) {
+      return Response.json({ error: "Primeiro acesso: crie sua senha pessoal pelo site (biocell-mu.vercel.app) e depois entre no app." }, { status: 403 });
+    }
     return Response.json({ user, token: await signToken(user, "7d") });
   }
 

@@ -13,19 +13,22 @@ import {
   AlertTriangle,
   Menu,
   FlaskConical,
+  UserCog,
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { CLINICAL_ROLES, roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
-  { href: "/prontuarios", label: "Prontuários", icon: ClipboardList, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
-  { href: "/pacientes", label: "Pacientes", icon: Users, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"] },
-  { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL"], serviceOrders: true },
+  { href: "/prontuarios", label: "Prontuários", icon: ClipboardList, roles: CLINICAL_ROLES as string[] },
+  { href: "/pacientes", label: "Pacientes", icon: Users, roles: CLINICAL_ROLES as string[] },
+  { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: CLINICAL_ROLES as string[], serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "UNIT_MANAGER"] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "UNIT_MANAGER"] },
   { href: "/alertas", label: "Alertas", icon: AlertTriangle, roles: null },
+  { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "UNIT_MANAGER"] },
 ];
 
 export default function Sidebar({ userName, userRole, hasServiceOrders = false }: { userName: string; userRole: string; hasServiceOrders?: boolean }) {
@@ -33,12 +36,6 @@ export default function Sidebar({ userName, userRole, hasServiceOrders = false }
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const roleLabel: Record<string, string> = {
-    ADMIN: "Administrador",
-    UNIT_MANAGER: "Gestor de Unidade",
-    PROFESSIONAL: "Profissional",
-    STOCK: "Estoque/Logística",
-  };
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -106,9 +103,14 @@ export default function Sidebar({ userName, userRole, hasServiceOrders = false }
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{userName}</p>
-              <p className="text-[10px] text-white/50">{roleLabel[userRole] || userRole}</p>
+              <p className="text-[10px] text-white/50">{roleLabel(userRole)}</p>
             </div>
           </div>
+          <Link href="/conta" onClick={() => setOpen(false)}
+            className="flex items-center gap-2 text-white/60 hover:text-white text-sm w-full px-3 py-2 rounded-lg hover:bg-sidebar-hover transition-colors">
+            <UserCog size={16} />
+            Minha conta
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-white/60 hover:text-white text-sm w-full px-3 py-2 rounded-lg hover:bg-sidebar-hover transition-colors"

@@ -60,6 +60,8 @@ model User {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   active         Boolean      @default(true)
+  // Senha provisória (criada/redefinida pela matriz ou gestor): obriga a trocar no próximo login
+  mustChangePassword Boolean  @default(false)
   createdAt      DateTime     @default(now())
 
   units          UserUnit[]
