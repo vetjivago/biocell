@@ -64,7 +64,7 @@ export default async function ProntuarioDetailPage({
         <ArrowLeft size={16} /> Voltar
       </Link>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Prontuário de Células-Tronco</h1>
           <p className="text-sm text-gray-500 mt-1">Nº {record.serialNumber.slice(0, 12)} • {record.unit.name}</p>

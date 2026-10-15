@@ -57,7 +57,7 @@ export default async function OrdensServicoPage({
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full min-w-[640px]">
+        <table className="w-full min-w-[720px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Nº Série</th>

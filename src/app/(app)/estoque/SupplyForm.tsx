@@ -112,7 +112,7 @@ export default function SupplyForm() {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="font-semibold text-gray-900">Abastecer Unidade</h2>
         <button onClick={() => { setOpen(false); setError(""); setSuccess(""); setManual(false); }} className="text-gray-400 hover:text-gray-600">
           <X size={20} />
