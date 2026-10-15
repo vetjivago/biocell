@@ -114,7 +114,8 @@ export default async function EstoquePage() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Saldo por Unidade e Lote</h2>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
@@ -155,6 +156,7 @@ export default async function EstoquePage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Movimentações Recentes */}
@@ -162,7 +164,8 @@ export default async function EstoquePage() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Movimentações Recentes</h2>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Data</th>
@@ -193,6 +196,7 @@ export default async function EstoquePage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
