@@ -2,8 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import CompleteButton from "./CompleteButton";
+import DeleteButton from "./DeleteButton";
 
 export default async function ProntuarioDetailPage({
   params,
@@ -54,6 +55,17 @@ export default async function ProntuarioDetailPage({
         <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${st.cls}`}>{st.label}</span>
       </div>
 
+      {record.status !== "COMPLETED" && (
+        <div className="flex items-center gap-3 mb-6">
+          <Link href={`/prontuarios/${record.id}/editar`}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors">
+            <Pencil size={16} />
+            Editar
+          </Link>
+          <DeleteButton recordId={record.id} />
+        </div>
+      )}
+
       {/* Dados do Animal */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4">
         <h2 className="font-semibold text-gray-900 mb-3">Dados do Animal</h2>
@@ -70,13 +82,17 @@ export default async function ProntuarioDetailPage({
       </div>
 
       {/* Protocolo */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4">
-        <h2 className="font-semibold text-gray-900 mb-3">Protocolo de Tratamento</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+      <div className={`rounded-xl shadow-sm border p-6 mb-4 ${record.status === "IN_PROGRESS" ? "bg-yellow-50 border-yellow-200" : "bg-white border-gray-100"}`}>
+        <h2 className="font-semibold text-gray-900 mb-1">Protocolo de Tratamento</h2>
+        {record.status === "IN_PROGRESS" && (
+          <p className="text-xs text-yellow-700 mb-3">Em preparo — informações do protocolo abaixo</p>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mt-2">
           <div className="sm:col-span-2"><p className="text-gray-500">Patologia</p><p className="font-medium">{record.pathology}</p></div>
           <div><p className="text-gray-500">Qtd Células</p><p className="font-medium">{record.cellQuantity || "–"}</p></div>
           <div><p className="text-gray-500">Via de Aplicação</p><p className="font-medium">{record.applicationRoute || "–"}</p></div>
           <div><p className="text-gray-500">Doadores</p><p className="font-medium">{record.donors || "–"}</p></div>
+          <div><p className="text-gray-500">Soro Coletado</p><p className="font-medium">{record.serumCollected ? "Sim" : "Não"}</p></div>
           <div><p className="text-gray-500">Profissional</p><p className="font-medium">{record.professional.name}</p></div>
         </div>
       </div>

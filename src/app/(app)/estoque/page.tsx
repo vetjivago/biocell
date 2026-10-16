@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle } from "lucide-react";
+import StockByUnit from "./StockByUnit";
 
 export default async function EstoquePage() {
   const session = await getSession();
@@ -48,12 +49,15 @@ export default async function EstoquePage() {
         batchNumber: batch?.batchNumber || "",
         productName: batch?.product.name || "",
         species: batch?.product.species || "",
-        expirationDate: batch?.expirationDate,
+        expirationDate: batch?.expirationDate?.toISOString() || null,
         balance: g._sum.quantity || 0,
       };
     })
     .filter((s) => s.balance > 0)
     .sort((a, b) => a.unitName.localeCompare(b.unitName));
+
+  const totalStraws = stock.reduce((s, i) => s + i.balance, 0);
+  const unitCount = new Set(stock.map((s) => s.unitId)).size;
 
   const typeLabels: Record<string, { label: string; cls: string }> = {
     RECEIPT: { label: "Recebimento", cls: "text-green-600" },
@@ -80,7 +84,7 @@ export default async function EstoquePage() {
             <Package className="text-primary" size={24} />
             <div>
               <p className="text-sm text-gray-500">Total de Palhetas</p>
-              <p className="text-2xl font-bold">{stock.reduce((s, i) => s + i.balance, 0)}</p>
+              <p className="text-2xl font-bold">{totalStraws}</p>
             </div>
           </div>
         </div>
@@ -88,8 +92,8 @@ export default async function EstoquePage() {
           <div className="flex items-center gap-3">
             <Package className="text-blue-500" size={24} />
             <div>
-              <p className="text-sm text-gray-500">Lotes Ativos</p>
-              <p className="text-2xl font-bold">{new Set(stock.map((s) => s.batchNumber)).size}</p>
+              <p className="text-sm text-gray-500">Unidades com Estoque</p>
+              <p className="text-2xl font-bold">{unitCount}</p>
             </div>
           </div>
         </div>
@@ -104,42 +108,11 @@ export default async function EstoquePage() {
         </div>
       </div>
 
-      {/* Estoque por Unidade/Lote */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Saldo por Unidade e Lote</h2>
-        </div>
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Lote</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Espécie</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Validade</th>
-              <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stock.map((s, i) => (
-              <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.unitName}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{s.productName}</td>
-                <td className="px-4 py-3 text-sm font-mono text-gray-600">{s.batchNumber}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{s.species}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {s.expirationDate ? new Date(s.expirationDate).toLocaleDateString("pt-BR") : "–"}
-                </td>
-                <td className={`px-4 py-3 text-sm font-bold text-right ${s.balance < 10 ? "text-red-500" : "text-gray-900"}`}>
-                  {s.balance}
-                </td>
-              </tr>
-            ))}
-            {stock.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">Nenhum estoque registrado</td></tr>
-            )}
-          </tbody>
-        </table>
+      {/* Estoque Agrupado por Unidade */}
+      <div className="mb-6">
+        <h2 className="font-semibold text-gray-900 mb-3">Estoque por Unidade</h2>
+        <p className="text-xs text-gray-500 mb-3">Clique em uma unidade para ver o estoque detalhado</p>
+        <StockByUnit stock={stock} />
       </div>
 
       {/* Movimentações Recentes */}
@@ -147,37 +120,39 @@ export default async function EstoquePage() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Movimentações Recentes</h2>
         </div>
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Data</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Tipo</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
-              <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto / Lote</th>
-              <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Qtd</th>
-              <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentTransactions.map((t) => {
-              const tl = typeLabels[t.type] || { label: t.type, cls: "text-gray-600" };
-              return (
-                <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(t.createdAt).toLocaleDateString("pt-BR")}</td>
-                  <td className={`px-4 py-3 text-sm font-medium ${tl.cls}`}>{tl.label}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{t.unit.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {t.batch.product.name} <span className="text-gray-400 font-mono">{t.batch.batchNumber}</span>
-                  </td>
-                  <td className={`px-4 py-3 text-sm font-bold text-right ${t.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
-                    {t.quantity > 0 ? `+${t.quantity}` : t.quantity}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-600">{t.balance}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Data</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Tipo</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Unidade</th>
+                <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto / Lote</th>
+                <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Qtd</th>
+                <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTransactions.map((t) => {
+                const tl = typeLabels[t.type] || { label: t.type, cls: "text-gray-600" };
+                return (
+                  <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-500">{new Date(t.createdAt).toLocaleDateString("pt-BR")}</td>
+                    <td className={`px-4 py-3 text-sm font-medium ${tl.cls}`}>{tl.label}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{t.unit.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {t.batch.product.name} <span className="text-gray-400 font-mono">{t.batch.batchNumber}</span>
+                    </td>
+                    <td className={`px-4 py-3 text-sm font-bold text-right ${t.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
+                      {t.quantity > 0 ? `+${t.quantity}` : t.quantity}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-600">{t.balance}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
