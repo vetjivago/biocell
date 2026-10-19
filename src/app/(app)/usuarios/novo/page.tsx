@@ -6,10 +6,11 @@ import { ArrowLeft } from "lucide-react";
 import { assignableRoles, canManageUsers } from "@/lib/roles";
 import UserForm from "../UserForm";
 
-export default async function NovoUsuarioPage() {
+export default async function NovoUsuarioPage({ searchParams }: { searchParams: Promise<{ unidade?: string }> }) {
   const session = await getSession();
   if (!session) return null;
   if (!canManageUsers(session.role)) notFound();
+  const { unidade } = await searchParams;
 
   const units = await prisma.unit.findMany({
     where: { active: true, ...(session.role === "ADMIN" ? {} : { id: { in: session.unitIds } }) },
@@ -26,7 +27,13 @@ export default async function NovoUsuarioPage() {
       <UserForm
         roles={assignableRoles(session.role)}
         units={units}
-        initial={{ name: "", email: "", role: "PROFESSIONAL", unitIds: units.length === 1 ? [units[0].id] : [], active: true }}
+        initial={{
+          name: "", email: "",
+          // Vindo do cadastro da unidade: já marca a unidade e sugere a função de gestor
+          role: unidade && units.some((u) => u.id === unidade) ? "UNIT_MANAGER" : "PROFESSIONAL",
+          unitIds: unidade && units.some((u) => u.id === unidade) ? [unidade] : units.length === 1 ? [units[0].id] : [],
+          active: true,
+        }}
       />
     </div>
   );
