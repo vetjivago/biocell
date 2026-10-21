@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
 import { assignableRoles, canManageUsers } from "./roles";
+import { normalizePhone } from "./phone";
 
 // Usuários que quem está logado pode ver/gerenciar
 export function manageableUsersWhere(session: SessionUser) {
@@ -38,4 +39,24 @@ export async function validateUnitIds(session: SessionUser, unitIds: unknown) {
 export function normalizeEmail(v: unknown) {
   const e = typeof v === "string" ? v.trim().toLowerCase() : "";
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
+}
+
+// E-mail e celular do formulário: vazio = não informado; preenchido errado = erro
+export function parseLoginFields(body: { email?: unknown; phone?: unknown }) {
+  const rawEmail = typeof body.email === "string" ? body.email.trim() : "";
+  const rawPhone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const email = rawEmail ? normalizeEmail(rawEmail) : null;
+  const phone = rawPhone ? normalizePhone(rawPhone) : null;
+  if (rawEmail && !email) return { error: "E-mail inválido" } as const;
+  if (rawPhone && !phone) return { error: "Celular inválido: use DDD + número, ex. (61) 99999-8888" } as const;
+  if (!email && !phone) return { error: "Informe o e-mail ou o celular (é o que a pessoa usa para entrar)" } as const;
+  return { email, phone } as const;
+}
+
+// E-mail ou celular já usado por outro acesso (excludeId: o próprio usuário, na edição)
+export async function loginTakenError({ email, phone }: { email: string | null; phone: string | null }, excludeId?: string) {
+  const not = excludeId ? { id: { not: excludeId } } : {};
+  if (email && (await prisma.user.findFirst({ where: { email, ...not } }))) return "Já existe um acesso com este e-mail";
+  if (phone && (await prisma.user.findFirst({ where: { phone, ...not } }))) return "Já existe um acesso com este celular";
+  return null;
 }

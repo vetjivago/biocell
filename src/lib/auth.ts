@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { cache } from "react";
+import { normalizePhone } from "./phone";
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "biocell-dev-secret"
@@ -11,7 +12,8 @@ const SECRET = new TextEncoder().encode(
 export interface SessionUser {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   role: string;
   organizationId: string;
   unitIds: string[];
@@ -47,6 +49,7 @@ const loadUser = cache(async (id: string): Promise<SessionUser | null> => {
     id: user.id,
     name: user.name,
     email: user.email,
+    phone: user.phone,
     role: user.role,
     organizationId: user.organizationId,
     unitIds: user.units.map((u) => u.unitId),
@@ -77,9 +80,13 @@ export async function destroySession() {
   cookieStore.delete("session");
 }
 
-export async function authenticate(email: string, password: string, { setCookie = true } = {}) {
+// Entra com e-mail ou celular (com ou sem máscara/DDI)
+export async function authenticate(login: string, password: string, { setCookie = true } = {}) {
+  const value = login.trim();
+  const phone = value.includes("@") ? null : normalizePhone(value);
+  if (!value.includes("@") && !phone) return null;
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: phone ? { phone } : { email: value.toLowerCase() },
     include: { units: true },
   });
 
@@ -92,6 +99,7 @@ export async function authenticate(email: string, password: string, { setCookie 
     id: user.id,
     name: user.name,
     email: user.email,
+    phone: user.phone,
     role: user.role,
     organizationId: user.organizationId,
     unitIds: user.units.map((u) => u.unitId),

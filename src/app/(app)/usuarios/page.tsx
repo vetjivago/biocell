@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatPhone } from "@/lib/phone";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -16,10 +17,10 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
   const users = await prisma.user.findMany({
     where: {
       ...manageableUsersWhere(session),
-      ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }, { units: { some: { unit: { name: { contains: query, mode: "insensitive" } } } } }] } : {}),
+      ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }, ...(query.replace(/\D/g, "").length >= 4 ? [{ phone: { contains: query.replace(/\D/g, "") } }] : []), { units: { some: { unit: { name: { contains: query, mode: "insensitive" } } } } }] } : {}),
     },
     select: {
-      id: true, name: true, email: true, role: true, active: true, mustChangePassword: true,
+      id: true, name: true, email: true, phone: true, role: true, active: true, mustChangePassword: true,
       units: { select: { unit: { select: { name: true } } } },
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -40,7 +41,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
       </div>
 
       <form className="mb-4">
-        <input name="q" defaultValue={q} placeholder="Buscar por nome, e-mail ou unidade..."
+        <input name="q" defaultValue={q} placeholder="Buscar por nome, e-mail, celular ou unidade..."
           className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm" />
       </form>
 
@@ -59,7 +60,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
               <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${u.active ? "" : "opacity-60"}`}>
                 <td className="px-4 py-3">
                   <Link href={`/usuarios/${u.id}`} className="text-sm font-medium text-primary hover:underline">{u.name}</Link>
-                  <p className="text-xs text-gray-500">{u.email}</p>
+                  <p className="text-xs text-gray-500">{[u.email, formatPhone(u.phone)].filter(Boolean).join(" · ")}</p>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">{roleLabel(u.role)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">
