@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateTempPassword, getSession, hashPassword } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { assignableRoles, canManageUsers, isRole } from "@/lib/roles";
-import { manageableUsersWhere, normalizeEmail, validateUnitIds } from "@/lib/users";
+import { loginTakenError, manageableUsersWhere, parseLoginFields, validateUnitIds } from "@/lib/users";
 
 export async function GET() {
   const session = await getSession();
@@ -12,7 +12,7 @@ export async function GET() {
   const users = await prisma.user.findMany({
     where: manageableUsersWhere(session),
     select: {
-      id: true, name: true, email: true, role: true, active: true, mustChangePassword: true, createdAt: true,
+      id: true, name: true, email: true, phone: true, role: true, active: true, mustChangePassword: true, createdAt: true,
       units: { select: { unit: { select: { id: true, name: true } } } },
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -28,9 +28,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
-  const email = normalizeEmail(body.email);
   if (!name) return Response.json({ error: "Informe o nome" }, { status: 400 });
-  if (!email) return Response.json({ error: "E-mail inválido" }, { status: 400 });
+  const login = parseLoginFields(body);
+  if ("error" in login) return Response.json({ error: login.error }, { status: 400 });
+  const { email, phone } = login;
   if (!isRole(body.role) || !assignableRoles(session.role).includes(body.role)) {
     return Response.json({ error: "Função não permitida" }, { status: 403 });
   }
@@ -39,24 +40,23 @@ export async function POST(request: NextRequest) {
   if (body.role !== "ADMIN" && units.ids.length === 0) {
     return Response.json({ error: "Escolha ao menos uma unidade" }, { status: 400 });
   }
-  if (await prisma.user.findUnique({ where: { email } })) {
-    return Response.json({ error: "Já existe um acesso com este e-mail" }, { status: 409 });
-  }
+  const taken = await loginTakenError({ email, phone });
+  if (taken) return Response.json({ error: taken }, { status: 409 });
 
   const tempPassword = generateTempPassword();
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
-        name, email, role: body.role,
+        name, email, phone, role: body.role,
         organizationId: session.organizationId,
         passwordHash: await hashPassword(tempPassword),
         mustChangePassword: true,
         units: { create: units.ids.map((unitId) => ({ unitId })) },
       },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, name: true, email: true, phone: true, role: true },
     });
     await tx.auditLog.create({
-      data: { userId: session.id, action: "CREATE", entity: "User", entityId: created.id, details: JSON.stringify({ email, role: body.role, unitIds: units.ids }) },
+      data: { userId: session.id, action: "CREATE", entity: "User", entityId: created.id, details: JSON.stringify({ email, phone, role: body.role, unitIds: units.ids }) },
     });
     return created;
   });

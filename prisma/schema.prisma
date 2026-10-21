@@ -54,7 +54,10 @@ model Unit {
 model User {
   id             String       @id @default(cuid())
   name           String
-  email          String       @unique
+  // Login por e-mail ou celular: pelo menos um dos dois
+  email          String?      @unique
+  // Celular só com dígitos, DDD + número (ex.: 61999998888)
+  phone          String?      @unique
   passwordHash   String
   role           String
   organizationId String

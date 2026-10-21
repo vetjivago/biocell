@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { assignableRoles, isRole } from "@/lib/roles";
 import { getManageableUser } from "@/lib/users";
+import { formatPhone } from "@/lib/phone";
 import UserForm from "../UserForm";
 
 export default async function EditarUsuarioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +36,7 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
         isSelf={user.id === session.id}
         roles={roles.includes(user.role) ? roles : [user.role, ...roles]}
         units={units}
-        initial={{ id: user.id, name: user.name, email: user.email, role: user.role, unitIds: visibleUnitIds, active: user.active }}
+        initial={{ id: user.id, name: user.name, email: user.email ?? "", phone: formatPhone(user.phone), role: user.role, unitIds: visibleUnitIds, active: user.active }}
       />
     </div>
   );

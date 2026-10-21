@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { assignableRoles, isRole } from "@/lib/roles";
-import { getManageableUser, validateUnitIds } from "@/lib/users";
+import { getManageableUser, loginTakenError, parseLoginFields, validateUnitIds } from "@/lib/users";
 
-// Edita nome, função, unidades ou ativa/desativa o acesso
+// Edita nome, e-mail/celular de login, função, unidades ou ativa/desativa o acesso
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
@@ -15,11 +15,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const isSelf = user.id === session.id;
 
   const body = await request.json();
-  const data: { name?: string; role?: string; active?: boolean } = {};
+  const data: { name?: string; email?: string | null; phone?: string | null; role?: string; active?: boolean } = {};
   if (body.name !== undefined) {
     const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
     if (!name) return Response.json({ error: "Informe o nome" }, { status: 400 });
     data.name = name;
+  }
+  if (body.email !== undefined || body.phone !== undefined) {
+    const login = parseLoginFields({ email: body.email ?? user.email ?? "", phone: body.phone ?? user.phone ?? "" });
+    if ("error" in login) return Response.json({ error: login.error }, { status: 400 });
+    const taken = await loginTakenError(login, id);
+    if (taken) return Response.json({ error: taken }, { status: 409 });
+    if (login.email !== user.email) data.email = login.email;
+    if (login.phone !== user.phone) data.phone = login.phone;
   }
   if (body.role !== undefined && body.role !== user.role) {
     if (isSelf) return Response.json({ error: "Você não pode mudar a sua própria função" }, { status: 400 });
@@ -47,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const u = await tx.user.update({ where: { id }, data, select: { id: true, name: true, email: true, role: true, active: true } });
+    const u = await tx.user.update({ where: { id }, data, select: { id: true, name: true, email: true, phone: true, role: true, active: true } });
     if (nextUnitIds) {
       await tx.userUnit.deleteMany({ where: { userId: id, unitId: { notIn: nextUnitIds } } });
       const existing = new Set(user.units.map((x) => x.unitId));
@@ -57,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "UPDATE", entity: "User", entityId: id,
-        details: JSON.stringify({ changed: { ...data, ...(nextUnitIds ? { unitIds: nextUnitIds } : {}) }, before: { name: user.name, role: user.role, active: user.active, unitIds: user.units.map((x) => x.unitId) } }),
+        details: JSON.stringify({ changed: { ...data, ...(nextUnitIds ? { unitIds: nextUnitIds } : {}) }, before: { name: user.name, email: user.email, phone: user.phone, role: user.role, active: user.active, unitIds: user.units.map((x) => x.unitId) } }),
       },
     });
     return u;
@@ -66,7 +74,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 // Exclui o acesso. Sem histórico: apaga de vez. Com prontuários, OS, atendimentos ou ações registradas:
-// o login é bloqueado, some das listas e o e-mail fica livre; o nome continua no histórico clínico
+// o login é bloqueado, some das listas e o e-mail/celular ficam livres; o nome continua no histórico clínico
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
@@ -81,14 +89,14 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     select: { _count: { select: { medicalRecords: true, clinicalEntries: true, serviceOrders: true, auditLogs: true } } },
   });
   const hasHistory = Object.values(counts?._count ?? {}).some((n) => n > 0);
-  const details = JSON.stringify({ name: user.name, email: user.email, role: user.role, unitIds: user.units.map((u) => u.unitId), hardDelete: !hasHistory });
+  const details = JSON.stringify({ name: user.name, email: user.email, phone: user.phone, role: user.role, unitIds: user.units.map((u) => u.unitId), hardDelete: !hasHistory });
 
   await prisma.$transaction(async (tx) => {
     await tx.userUnit.deleteMany({ where: { userId: id } });
     if (hasHistory) {
       await tx.user.update({
         where: { id },
-        data: { active: false, deletedAt: new Date(), email: `excluido-${id}@excluido.biocell` },
+        data: { active: false, deletedAt: new Date(), email: `excluido-${id}@excluido.biocell`, phone: null },
       });
     } else {
       await tx.user.delete({ where: { id } });

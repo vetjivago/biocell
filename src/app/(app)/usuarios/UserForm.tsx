@@ -4,19 +4,21 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, KeyRound, Trash2 } from "lucide-react";
 import { ROLES, roleFlags, roleFromFlags, type Role } from "@/lib/roles";
+import { formatPhone, normalizePhone } from "@/lib/phone";
 
 const TEAM_ROLES: Role[] = ["PROFESSIONAL", "LAB", "PROFESSIONAL_LAB"];
 
 interface Unit { id: string; name: string; city: string; state: string }
-interface Initial { id?: string; name: string; email: string; role: Role; unitIds: string[]; active: boolean }
+interface Initial { id?: string; name: string; email: string; phone: string; role: Role; unitIds: string[]; active: boolean }
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
 
 // Senha provisória mostrada uma única vez, com botão de copiar
-export function TempPasswordBox({ email, password }: { email: string; password: string }) {
+export function TempPasswordBox({ email, phone, password }: { email: string; phone: string; password: string }) {
   const [copied, setCopied] = useState(false);
-  const text = `Acesso BIO CELL\nEndereço: ${typeof window !== "undefined" ? window.location.origin : ""}\nE-mail: ${email}\nSenha provisória: ${password}\n(no primeiro acesso o sistema pede para criar uma senha pessoal)`;
+  const login = [email && `E-mail: ${email}`, phone && `Celular: ${formatPhone(normalizePhone(phone)) || phone}`].filter(Boolean).join("\n");
+  const text = `Acesso BIO CELL\nEndereço: ${typeof window !== "undefined" ? window.location.origin : ""}\nEntre com o ${email && phone ? "e-mail ou o celular" : email ? "e-mail" : "celular"}:\n${login}\nSenha provisória: ${password}\n(no primeiro acesso o sistema pede para criar uma senha pessoal)`;
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm space-y-2">
       <p className="font-semibold text-amber-900 flex items-center gap-2"><KeyRound size={16} /> Senha provisória (anote ou copie agora — ela não aparece de novo)</p>
@@ -75,7 +77,8 @@ export default function UserForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
-        ...(isEdit ? {} : { email: form.email }),
+        email: form.email,
+        phone: form.phone,
         role: form.role,
         unitIds: needsUnits ? form.unitIds : [],
         ...(isEdit ? { active: form.active } : {}),
@@ -114,8 +117,8 @@ export default function UserForm({
   if (temp && !isEdit) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <p className="text-sm text-gray-700">Acesso criado para <strong>{form.name}</strong> ({form.email}).</p>
-        <TempPasswordBox email={form.email} password={temp} />
+        <p className="text-sm text-gray-700">Acesso criado para <strong>{form.name}</strong> ({[form.email, form.phone].filter(Boolean).join(" · ")}).</p>
+        <TempPasswordBox email={form.email} phone={form.phone} password={temp} />
         <div className="flex gap-2">
           <button type="button" onClick={() => router.push("/usuarios")} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Voltar para a lista</button>
           <button type="button" onClick={() => { setTemp(null); setForm({ ...initial }); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Criar outro acesso</button>
@@ -129,10 +132,17 @@ export default function UserForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label className={label}>Nome *</label><input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={input} /></div>
         <div>
-          <label className={label}>E-mail (login) *</label>
-          <input required type="email" value={form.email} disabled={isEdit} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            className={`${input} disabled:bg-gray-50 disabled:text-gray-600`} />
+          <label className={label}>Celular (login)</label>
+          <input type="tel" inputMode="tel" value={form.phone} placeholder="(61) 99999-8888"
+            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            onBlur={() => setForm((f) => ({ ...f, phone: formatPhone(normalizePhone(f.phone)) || f.phone }))}
+            className={input} />
         </div>
+        <div>
+          <label className={label}>E-mail (login)</label>
+          <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className={input} />
+        </div>
+        <p className="sm:col-span-2 -mt-2 text-xs text-gray-400">Preencha o celular, o e-mail ou os dois: a pessoa entra com qualquer um deles e a senha.</p>
       </div>
 
       <div>
@@ -196,7 +206,7 @@ export default function UserForm({
         </label>
       )}
 
-      {temp && isEdit && <TempPasswordBox email={form.email} password={temp} />}
+      {temp && isEdit && <TempPasswordBox email={form.email} phone={form.phone} password={temp} />}
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
       {saved && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg text-sm">Alterações salvas.</div>}
 

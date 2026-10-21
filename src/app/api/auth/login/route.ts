@@ -16,14 +16,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, password, client } = await request.json();
+  // "login" = e-mail ou celular; versões antigas do app ainda mandam "email"
+  const { login, email, password, client } = await request.json();
+  const identifier = typeof login === "string" ? login : typeof email === "string" ? email : "";
   const isMobile = client === "mobile";
 
-  if (!email || !password) {
-    return Response.json({ error: "Email e senha são obrigatórios" }, { status: 400 });
+  if (!identifier.trim() || !password) {
+    return Response.json({ error: "Informe o e-mail ou celular e a senha" }, { status: 400 });
   }
 
-  const user = await authenticate(email, password, { setCookie: !isMobile });
+  const user = await authenticate(identifier, password, { setCookie: !isMobile });
   if (!user) {
     return Response.json({ error: "Credenciais inválidas" }, { status: 401 });
   }
