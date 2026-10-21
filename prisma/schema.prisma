@@ -62,6 +62,8 @@ model User {
   active         Boolean      @default(true)
   // Senha provisória (criada/redefinida pela matriz ou gestor): obriga a trocar no próximo login
   mustChangePassword Boolean  @default(false)
+  // Excluído pela matriz/gestor: some das listas e não entra mais; o nome continua no histórico clínico
+  deletedAt      DateTime?
   createdAt      DateTime     @default(now())
 
   units          UserUnit[]

@@ -4,9 +4,10 @@ import { assignableRoles, canManageUsers } from "./roles";
 
 // Usuários que quem está logado pode ver/gerenciar
 export function manageableUsersWhere(session: SessionUser) {
-  if (session.role === "ADMIN") return {};
+  if (session.role === "ADMIN") return { deletedAt: null };
   // Gestor: equipe das suas unidades, sem acessos de matriz/estoque central
   return {
+    deletedAt: null,
     role: { in: assignableRoles(session.role) },
     units: { some: { unitId: { in: session.unitIds } } },
   };

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { syncOpenLowStockAlerts } from "@/lib/stock-alerts";
 
 export default async function AlertasPage() {
   const session = await getSession();
@@ -9,6 +10,7 @@ export default async function AlertasPage() {
 
   const isAdmin = session.role === "ADMIN";
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
+  await syncOpenLowStockAlerts(isAdmin ? undefined : session.unitIds);
 
   const alerts = await prisma.alert.findMany({
     where: unitFilter,

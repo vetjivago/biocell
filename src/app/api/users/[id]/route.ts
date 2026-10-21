@@ -64,3 +64,36 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   });
   return Response.json(updated);
 }
+
+// Exclui o acesso. Sem histórico: apaga de vez. Com prontuários, OS, atendimentos ou ações registradas:
+// o login é bloqueado, some das listas e o e-mail fica livre; o nome continua no histórico clínico
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+  const access = await getManageableUser(session, id);
+  if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
+  const { user } = access;
+  if (user.id === session.id) return Response.json({ error: "Você não pode excluir o seu próprio acesso" }, { status: 400 });
+
+  const counts = await prisma.user.findUnique({
+    where: { id },
+    select: { _count: { select: { medicalRecords: true, clinicalEntries: true, serviceOrders: true, auditLogs: true } } },
+  });
+  const hasHistory = Object.values(counts?._count ?? {}).some((n) => n > 0);
+  const details = JSON.stringify({ name: user.name, email: user.email, role: user.role, unitIds: user.units.map((u) => u.unitId), hardDelete: !hasHistory });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.userUnit.deleteMany({ where: { userId: id } });
+    if (hasHistory) {
+      await tx.user.update({
+        where: { id },
+        data: { active: false, deletedAt: new Date(), email: `excluido-${id}@excluido.biocell` },
+      });
+    } else {
+      await tx.user.delete({ where: { id } });
+    }
+    await tx.auditLog.create({ data: { userId: session.id, action: "DELETE", entity: "User", entityId: id, details } });
+  });
+  return Response.json({ ok: true });
+}

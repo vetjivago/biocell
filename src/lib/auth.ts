@@ -42,7 +42,7 @@ export async function createSession(user: SessionUser) {
 // valem na hora, sem esperar o token expirar
 const loadUser = cache(async (id: string): Promise<SessionUser | null> => {
   const user = await prisma.user.findUnique({ where: { id }, include: { units: { select: { unitId: true } } } });
-  if (!user || !user.active) return null;
+  if (!user || !user.active || user.deletedAt) return null;
   return {
     id: user.id,
     name: user.name,
@@ -83,7 +83,7 @@ export async function authenticate(email: string, password: string, { setCookie 
     include: { units: true },
   });
 
-  if (!user || !user.active) return null;
+  if (!user || !user.active || user.deletedAt) return null;
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return null;

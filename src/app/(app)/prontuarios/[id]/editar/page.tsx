@@ -49,7 +49,7 @@ export default async function EditarProntuarioPage({ params }: { params: Promise
         <ArrowLeft size={16} /> Voltar
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Editar prontuário – {record.patient.name}</h1>
-      <p className="text-sm text-gray-500 mb-6">Nº {record.serialNumber.slice(0, 12)} · as alterações ficam registradas no histórico de auditoria</p>
+      <p className="text-sm text-gray-500 mb-6">Nº {record.serialNumber} · as alterações ficam registradas no histórico de auditoria</p>
       <EditRecordForm
         stock={stock}
         initial={{

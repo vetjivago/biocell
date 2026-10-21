@@ -89,8 +89,8 @@ async function main() {
   const matriz = await prisma.unit.create({
     data: {
       name: "MATRIZ BIO CELL",
-      city: "São Paulo",
-      state: "SP",
+      city: "Brasília",
+      state: "DF",
       species: "Canino, Felino, Equino",
       address: "Matriz Bio Cell – Vetnil",
       organizationId: org.id,

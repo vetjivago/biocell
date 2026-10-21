@@ -60,7 +60,7 @@ export default async function ProntuariosPage() {
                 <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/prontuarios/${r.id}`} className="text-sm font-mono text-primary hover:underline">
-                      {r.serialNumber.slice(0, 8)}
+                      {r.serialNumber}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 font-medium">{r.patient.name}</td>

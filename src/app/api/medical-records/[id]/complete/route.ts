@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { syncLowStockAlert } from "@/lib/stock-alerts";
 
 interface ConsumptionItem {
   batchId: string;
@@ -110,38 +111,8 @@ export async function POST(
     return updated;
   });
 
-  // Check stock threshold for cells only (default: 15)
-  const cellBatchIds = consumptionItems.filter((i) => i.category === "CELULAS").map((i) => i.batchId);
-  if (cellBatchIds.length > 0) {
-    const allCellTransactions = await prisma.inventoryTransaction.aggregate({
-      where: {
-        unitId: record.unitId,
-        batch: { product: { category: "CELULAS" } },
-      },
-      _sum: { quantity: true },
-    });
-    const totalCellBalance = allCellTransactions._sum.quantity || 0;
-
-    const threshold = await prisma.stockThreshold.findFirst({
-      where: { unitId: record.unitId },
-    });
-    const minStraws = threshold?.minimumStraws ?? 15;
-
-    if (totalCellBalance <= minStraws) {
-      const existingAlert = await prisma.alert.findFirst({
-        where: { unitId: record.unitId, type: "LOW_STOCK", resolved: false },
-      });
-      if (!existingAlert) {
-        await prisma.alert.create({
-          data: {
-            unitId: record.unitId,
-            type: "LOW_STOCK",
-            message: `Estoque baixo de células: ${totalCellBalance} palhetas restantes (mínimo: ${minStraws})`,
-          },
-        });
-      }
-    }
-  }
+  // Recalcula o alerta de estoque baixo de células da unidade
+  if (consumptionItems.some((i) => i.category === "CELULAS")) await syncLowStockAlert(record.unitId);
 
   return Response.json(updatedRecord);
 }

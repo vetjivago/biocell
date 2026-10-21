@@ -7,7 +7,7 @@ INSERT INTO "Organization" ("id", "name", "createdAt") VALUES
 
 -- Matriz
 INSERT INTO "Unit" ("id", "name", "city", "state", "species", "address", "phone", "organizationId", "createdAt") VALUES
-('unit_matriz', 'MATRIZ BIO CELL', 'São Paulo', 'SP', 'Cão, gato, equino', 'Matriz Bio Cell – Vetnil', '', 'org_biocell', NOW());
+('unit_matriz', 'MATRIZ BIO CELL', 'Brasília', 'DF', 'Cão, gato, equino', 'Matriz Bio Cell – Vetnil', '', 'org_biocell', NOW());
 
 -- 73 UABCs
 INSERT INTO "Unit" ("id", "name", "city", "state", "species", "phone", "address", "organizationId", "createdAt") VALUES

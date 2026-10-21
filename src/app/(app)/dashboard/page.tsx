@@ -10,10 +10,12 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import { syncOpenLowStockAlerts } from "@/lib/stock-alerts";
 
 async function getDashboardData(session: { role: string; unitIds: string[] }) {
   const isAdmin = session.role === "ADMIN";
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
+  await syncOpenLowStockAlerts(isAdmin ? undefined : session.unitIds);
 
   const [
     totalUnits,
@@ -29,7 +31,7 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     prisma.patient.count({ where: unitFilter }),
     prisma.medicalRecord.count({ where: unitFilter }),
     prisma.medicalRecord.count({ where: { ...unitFilter, status: "OPEN" } }),
-    prisma.alert.count({ where: { resolved: false, type: "LOW_STOCK" } }),
+    prisma.alert.count({ where: { ...unitFilter, resolved: false, type: "LOW_STOCK" } }),
     prisma.medicalRecord.findMany({
       where: unitFilter,
       include: { patient: true, unit: true, professional: true },
@@ -83,12 +85,10 @@ export default async function DashboardPage() {
   const isAdmin = session.role === "ADMIN";
   const totalStock = data.stockByUnit.reduce((sum, s) => sum + s.totalStraws, 0);
 
-  const stats = isAdmin
+  // Matriz: só unidades ativas no topo (clicável); o restante fica nos quadros abaixo
+  const stats: { label: string; value: number; icon: typeof Building2; color: string; href?: string }[] = isAdmin
     ? [
-        { label: "Unidades Ativas", value: data.totalUnits, icon: Building2, color: "bg-blue-500" },
-        { label: "Pacientes", value: data.totalPatients, icon: Users, color: "bg-green-500" },
-        { label: "Prontuários", value: data.totalRecords, icon: ClipboardList, color: "bg-purple-500" },
-        { label: "Em Atendimento", value: data.openRecords, icon: TrendingUp, color: "bg-orange-500" },
+        { label: "Unidades Ativas", value: data.totalUnits, icon: Building2, color: "bg-blue-500", href: "/unidades" },
       ]
     : [
         { label: "Palhetas em Estoque", value: totalStock, icon: Package, color: "bg-blue-500" },
@@ -107,19 +107,27 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+        {stats.map((stat) => {
+          const body = (
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">{stat.label}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                {stat.href && <p className="text-xs text-primary mt-1 flex items-center gap-0.5">Ver unidades <ChevronRight size={12} /></p>}
               </div>
               <div className={`${stat.color} p-3 rounded-lg`}>
                 <stat.icon className="text-white" size={22} />
               </div>
             </div>
-          </div>
-        ))}
+          );
+          return stat.href ? (
+            <Link key={stat.label} href={stat.href} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:border-primary/30 transition-all">
+              {body}
+            </Link>
+          ) : (
+            <div key={stat.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">{body}</div>
+          );
+        })}
       </div>
 
       {data.lowStockAlerts > 0 && (

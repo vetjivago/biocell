@@ -350,7 +350,7 @@ export default async function PacienteDetailPage({
                             <div className="min-w-0">
                               <p className="text-xs text-gray-500">{fmtDateTime(r.createdAt)}</p>
                               <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><Dna size={14} /> Prontuário CT</p>
-                              <p className="text-sm text-gray-600 truncate">{r.pathology} · Nº {r.serialNumber.slice(0, 8)}</p>
+                              <p className="text-sm text-gray-600 truncate">{r.pathology} · Nº {r.serialNumber}</p>
                             </div>
                             <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
                           </div>

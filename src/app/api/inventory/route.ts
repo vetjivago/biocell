@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { normalizeBatchNumber, standardProduct } from "@/lib/products";
+import { syncLowStockAlert } from "@/lib/stock-alerts";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -96,23 +97,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Auto-resolve LOW_STOCK alerts if total unit balance is above threshold (default: 15)
-  if (type === "SUPPLY" || type === "TRANSFER_IN" || type === "RECEIPT") {
-    const totalUnit = await prisma.inventoryTransaction.aggregate({
-      where: { unitId, batch: { product: { category: "CELULAS" } } },
-      _sum: { quantity: true },
-    });
-    const totalBalance = totalUnit._sum.quantity || 0;
-    const threshold = await prisma.stockThreshold.findFirst({ where: { unitId } });
-    const minStraws = threshold?.minimumStraws ?? 15;
-
-    if (totalBalance > minStraws) {
-      await prisma.alert.updateMany({
-        where: { unitId, type: "LOW_STOCK", resolved: false },
-        data: { resolved: true },
-      });
-    }
-  }
+  // Qualquer entrada ou saída recalcula o alerta de estoque baixo
+  await syncLowStockAlert(unitId);
 
   return Response.json(transaction, { status: 201 });
 }
