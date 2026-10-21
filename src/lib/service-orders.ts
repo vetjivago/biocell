@@ -36,3 +36,8 @@ export function optDate(v: unknown): Date | null | "invalid" {
   const d = new Date(String(v));
   return Number.isNaN(d.getTime()) ? "invalid" : d;
 }
+
+// Quem pode apagar uma OS ainda sem prontuário: quem abriu, o gestor da unidade ou a matriz
+export function canDeleteOrder(session: SessionUser, order: { createdById: string }) {
+  return order.createdById === session.id || session.role === "ADMIN" || session.role === "UNIT_MANAGER";
+}

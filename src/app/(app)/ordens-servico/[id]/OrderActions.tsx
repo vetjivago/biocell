@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Paperclip, Pencil, FlaskConical, FilePlus } from "lucide-react";
+import { Paperclip, Pencil, FlaskConical, FilePlus, Trash2 } from "lucide-react";
 import { CHECKLIST_TERMS, ROUTE_OPTIONS, type ChecklistKey } from "@/lib/service-order-types";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/clinical-types";
 
@@ -285,5 +285,29 @@ export function Checklist({
       })}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
+  );
+}
+
+// Apaga a OS enquanto nenhuma aplicação tem prontuário (aberta por engano, paciente desistiu...)
+export function DeleteOrderButton({ orderId, serialNumber }: { orderId: string; serialNumber: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    if (!confirm(`Apagar a OS ${serialNumber}? As aplicações e os anexos dela também são apagados. Não dá para desfazer.`)) return;
+    setBusy(true);
+    const res = await fetch(`/api/service-orders/${orderId}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return alert(data.error || "Erro ao apagar");
+    router.push("/ordens-servico");
+    router.refresh();
+  }
+
+  return (
+    <button type="button" onClick={remove} disabled={busy}
+      className="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+      <Trash2 size={14} /> {busy ? "Apagando..." : "Apagar OS"}
+    </button>
   );
 }

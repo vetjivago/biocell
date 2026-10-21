@@ -3,9 +3,9 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { APP_STATUS, ORDER_STATUS, getAccessibleOrder, orderStatus, parseChecklist } from "@/lib/service-orders";
+import { APP_STATUS, ORDER_STATUS, canDeleteOrder, getAccessibleOrder, orderStatus, parseChecklist } from "@/lib/service-orders";
 import PrintButton from "../../pacientes/[id]/geral/PrintButton";
-import { AddApplication, ApplicationActions, Checklist } from "./OrderActions";
+import { AddApplication, ApplicationActions, Checklist, DeleteOrderButton } from "./OrderActions";
 
 const tz = { timeZone: "America/Sao_Paulo" } as const;
 // Datas de aplicação são só dia (gravadas à meia-noite UTC)
@@ -45,6 +45,8 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
   const requested = parseChecklist(order.checklist);
   const now = new Date().toLocaleString("pt-BR", { ...tz, dateStyle: "short", timeStyle: "short" });
   const nextNumber = (order.applications.at(-1)?.number || 0) + 1;
+  // Sem nenhum prontuário preenchido a OS ainda pode ser apagada
+  const canDelete = canDeleteOrder(session, order) && !order.applications.some((a) => a.status === "DONE" || a.medicalRecordId);
 
   return (
     <div className="max-w-3xl">
@@ -54,6 +56,7 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
         </Link>
         <div className="flex items-center gap-2">
           <Link href={`/pacientes/${p.id}?aba=ct`} className="text-sm text-primary hover:underline">Ver paciente</Link>
+          {canDelete && <DeleteOrderButton orderId={order.id} serialNumber={order.serialNumber} />}
           <PrintButton />
         </div>
       </div>

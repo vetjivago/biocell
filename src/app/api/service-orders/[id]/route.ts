@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { CHECKLIST_TERMS, getAccessibleOrder, optText, parseChecklist } from "@/lib/service-orders";
+import { CHECKLIST_TERMS, canDeleteOrder, getAccessibleOrder, optText, parseChecklist } from "@/lib/service-orders";
 
 // Edita dados gerais da OS, o checklist ("solicitado") ou cancela
 export async function PATCH(
@@ -45,4 +45,40 @@ export async function PATCH(
     return u;
   });
   return Response.json(updated);
+}
+
+// Apaga a OS aberta por engano: só enquanto nenhuma aplicação tem prontuário preenchido
+// (depois disso ela faz parte do histórico clínico). Aplicações e anexos saem junto
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+  const access = await getAccessibleOrder(session, id);
+  if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
+  const { order } = access;
+  if (!canDeleteOrder(session, order)) {
+    return Response.json({ error: "Só quem abriu a OS, o gestor da unidade ou a matriz podem apagá-la" }, { status: 403 });
+  }
+
+  const apps = await prisma.serviceOrderApplication.findMany({
+    where: { serviceOrderId: id },
+    select: { number: true, status: true, medicalRecordId: true },
+  });
+  if (apps.some((a) => a.status === "DONE" || a.medicalRecordId)) {
+    return Response.json({ error: "Esta OS já tem prontuário preenchido e não pode mais ser apagada" }, { status: 409 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.serviceOrder.delete({ where: { id } });
+    await tx.auditLog.create({
+      data: {
+        userId: session.id, action: "DELETE", entity: "ServiceOrder", entityId: id,
+        details: JSON.stringify({ serialNumber: order.serialNumber, patientId: order.patientId, unitId: order.unitId, createdById: order.createdById, applications: apps.length }),
+      },
+    });
+  });
+  return Response.json({ ok: true });
 }
