@@ -66,6 +66,7 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     lowStockAlerts,
     recentRecords,
     stockByUnit: stockByUnit.map((s) => ({
+      unitId: s.unitId,
       unitName: unitMap[s.unitId] || s.unitId,
       totalStraws: s._sum.quantity || 0,
     })),
@@ -215,12 +216,12 @@ export default async function DashboardPage() {
                 {data.stockByUnit
                   .sort((a, b) => a.totalStraws - b.totalStraws)
                   .map((s) => (
-                    <div key={s.unitName} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <Link key={s.unitId} href={`/estoque?unidade=${s.unitId}#${s.unitId}`} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg">
                       <span className="text-sm text-gray-700 truncate mr-2">{s.unitName}</span>
                       <span className={`text-sm font-bold ${s.totalStraws < 10 ? "text-red-500" : "text-gray-900"}`}>
                         {s.totalStraws}
                       </span>
-                    </div>
+                    </Link>
                   ))}
               </div>
           </div>
