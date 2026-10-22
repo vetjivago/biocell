@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, X, FileText } from "lucide-react";
 import { compressImage } from "@/lib/compress-image";
+import { textToHtml } from "@/lib/rich-text";
+import RichTextEditor from "@/components/RichTextEditor";
 import { PATHOLOGIES } from "@/lib/pathologies";
 import {
   ATTENDANCE_SUBTYPES, ENTRY_TEMPLATES, ENTRY_TYPES, MAX_ATTACHMENT_BYTES, TITLE_LABEL, type EntryType,
@@ -267,14 +269,13 @@ export default function EntryForm({ patientId, initial }: { patientId: string; i
             </label>
             {template && !isEdit && (
               <button type="button" className="text-xs text-primary hover:underline"
-                onClick={() => update("content", form.content.trim() ? `${form.content}\n\n${template}` : template)}>
+                onClick={() => update("content", textToHtml(form.content) + textToHtml(template))}>
                 Inserir roteiro
               </button>
             )}
           </div>
-          <textarea value={form.content} onChange={(e) => update("content", e.target.value)}
-            rows={type === "PESO" || type === "PATOLOGIA" || type === "FOTOS" || type === "VIDEO" ? 3 : 14}
-            className={`${input} leading-relaxed font-[inherit]`}
+          <RichTextEditor value={form.content} onChange={(html) => update("content", html)}
+            minHeight={type === "PESO" || type === "PATOLOGIA" || type === "FOTOS" || type === "VIDEO" ? 90 : 300}
             placeholder={type === "ATENDIMENTO" ? "Anamnese, histórico, exame físico, achados, conduta..." : ""} />
           <p className="text-xs text-gray-400 mt-1">
             Rascunho salvo neste aparelho a cada 20 segundos{lastSaved ? ` · último às ${fmtTime(lastSaved)}` : ""}.

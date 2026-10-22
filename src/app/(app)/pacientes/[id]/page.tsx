@@ -9,6 +9,7 @@ import {
 import { ENTRY_TYPES, isEntryType, type EntryType } from "@/lib/clinical-types";
 import { ORDER_STATUS, orderStatus } from "@/lib/service-order-types";
 import { formatAge } from "@/lib/patient-fields";
+import { htmlToText } from "@/lib/rich-text";
 import PrintButton from "./geral/PrintButton";
 import PhotoUpload from "./PhotoUpload";
 
@@ -359,7 +360,7 @@ export default async function PacienteDetailPage({
                     }
                     const e = item.entry;
                     const t = isEntryType(e.type) ? ENTRY_TYPES[e.type] : { label: e.type, color: "#6b7280" };
-                    const firstLine = e.content.split("\n").find((l) => l.trim()) || "";
+                    const firstLine = htmlToText(e.content).split("\n").find((l) => l.trim()) || "";
                     const line1 = e.type === "ATENDIMENTO" && e.subtype ? e.subtype : null;
                     const line2 = e.type === "PESO"
                       ? `${e.weight?.toLocaleString("pt-BR")} kg${e.title ? ` – ${e.title}` : ""}`

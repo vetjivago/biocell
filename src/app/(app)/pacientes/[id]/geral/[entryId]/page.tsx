@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ArrowLeft, Download, FileText, ImageIcon, Pencil } from "lucide-react";
 import { ENTRY_TYPES } from "@/lib/clinical-types";
 import PrintButton from "../PrintButton";
+import { isHtml } from "@/lib/rich-text";
+import { sanitizeRichText } from "@/lib/rich-text-server";
 
 function formatSize(bytes: number) {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -98,7 +100,10 @@ export default async function RegistroPage({
         )}
 
         {entry.content.trim() ? (
-          <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{entry.content}</div>
+          isHtml(entry.content)
+            // HTML já filtrado ao gravar; filtrado de novo aqui por segurança
+            ? <div className="rich-text text-sm text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeRichText(entry.content) }} />
+            : <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{entry.content}</div>
         ) : entry.type !== "PESO" ? (
           <p className="text-sm text-gray-400">Sem descrição.</p>
         ) : null}

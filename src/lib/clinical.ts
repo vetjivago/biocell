@@ -3,6 +3,8 @@ import type { SessionUser } from "./auth";
 
 export * from "./clinical-types";
 import { CONTENT_OPTIONAL, isHttpUrl, type EntryType } from "./clinical-types";
+import { htmlToText } from "./rich-text";
+import { sanitizeRichText } from "./rich-text-server";
 
 // Paciente acessível pelo usuário e com prontuário geral habilitado na unidade
 export async function getGeneralRecordPatient(session: SessionUser, patientId: string) {
@@ -52,7 +54,8 @@ export function parseEntryFields(
   };
 
   if (has("title")) data.title = text(body.title, 200);
-  if (has("content")) data.content = typeof body.content === "string" ? body.content.slice(0, 50_000) : "";
+  // Texto formatado: filtrado aqui (só a formatação do editor passa); o limite conta as tags
+  if (has("content")) data.content = typeof body.content === "string" ? sanitizeRichText(body.content.slice(0, 200_000)) : "";
   if (has("subtype")) data.subtype = type === "ATENDIMENTO" ? text(body.subtype, 100) : null;
   if (has("videoUrl")) {
     const url = type === "VIDEO" ? text(body.videoUrl, 500) : null;
@@ -81,7 +84,7 @@ export function parseEntryFields(
   if (type === "INTERNACAO" && final.endedAt && final.occurredAt && final.endedAt < final.occurredAt) {
     return { error: "A alta não pode ser antes da entrada" };
   }
-  if (!CONTENT_OPTIONAL.includes(type) && !final.content?.trim() && !final.title && !final.subtype) {
+  if (!CONTENT_OPTIONAL.includes(type) && !htmlToText(final.content ?? "").trim() && !final.title && !final.subtype) {
     return { error: "Preencha o resumo ou o texto do registro" };
   }
   return { data };
