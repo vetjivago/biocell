@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { normalizeBatchNumber, standardProduct } from "@/lib/products";
+import { NO_LOT, normalizeBatchNumber, standardProduct } from "@/lib/products";
 import { syncLowStockAlert } from "@/lib/stock-alerts";
 
 export async function GET(request: NextRequest) {
@@ -47,13 +47,19 @@ export async function POST(request: NextRequest) {
 
   let resolvedBatchId = batchId;
 
-  // Lote novo: produto vem do catálogo padronizado (CTM CANINO/FELINO/EQUINO, SORO, MEIO)
-  if (!resolvedBatchId && body.batchNumber) {
+  // Produto vem do catálogo padronizado; o lote é encontrado ou criado pelo número (materiais: sem lote)
+  if (!resolvedBatchId && productId) {
     const product = standardProduct(productId);
-    if (!product) return Response.json({ error: "Escolha o produto na lista" }, { status: 400 });
-    const batchNumber = normalizeBatchNumber(String(body.batchNumber)).slice(0, 80);
+    if (!product || product.legacy) return Response.json({ error: "Escolha o produto na lista" }, { status: 400 });
+    const batchNumber = normalizeBatchNumber(String(body.batchNumber ?? "")).slice(0, 80)
+      || (product.category === "MATERIAL" ? NO_LOT : "");
     if (!batchNumber) return Response.json({ error: "Informe o lote" }, { status: 400 });
 
+    await prisma.cellProduct.upsert({
+      where: { id: product.id },
+      update: {},
+      create: { id: product.id, name: product.name, code: product.code, category: product.category, species: product.species, description: product.presentation },
+    });
     let batch = await prisma.cellBatch.findFirst({ where: { batchNumber, productId: product.id } });
     if (!batch) {
       batch = await prisma.cellBatch.create({ data: { batchNumber, productId: product.id, totalStraws: 0 } });

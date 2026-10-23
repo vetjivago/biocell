@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Plus, Trash2 } from "lucide-react";
+import { lotLabel } from "@/lib/products";
 
 interface StockItem {
   batchId: string;
@@ -21,6 +22,7 @@ const CATEGORIES = [
   { key: "CELULAS", label: "Células-Tronco", unit: "palhetas", required: true },
   { key: "MEIO", label: "Meio de Preparo", unit: "unidades", required: true },
   { key: "SORO", label: "Soro", unit: "unidades", required: true },
+  { key: "MATERIAL", label: "Materiais", unit: "unidades", required: false },
 ];
 
 function parseQuantity(cellQuantity: string | null): string {
@@ -51,6 +53,7 @@ export default function CompleteButton({
     CELULAS: [{ batchId: "", quantity: "" }],
     MEIO: [{ batchId: "", quantity: "" }],
     SORO: [{ batchId: "", quantity: "" }],
+    MATERIAL: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -70,9 +73,9 @@ export default function CompleteButton({
               const rows = plannedItems
                 .filter((p) => p.category === cat)
                 .map((p) => ({ batchId: p.batchId, quantity: p.quantity.toString() }));
-              return rows.length > 0 ? rows : [{ batchId: "", quantity: "" }];
+              return rows.length > 0 || cat === "MATERIAL" ? rows : [{ batchId: "", quantity: "" }];
             };
-            setItems({ CELULAS: fromPlan("CELULAS"), MEIO: fromPlan("MEIO"), SORO: fromPlan("SORO") });
+            setItems({ CELULAS: fromPlan("CELULAS"), MEIO: fromPlan("MEIO"), SORO: fromPlan("SORO"), MATERIAL: fromPlan("MATERIAL") });
             return;
           }
           setItems({
@@ -88,6 +91,7 @@ export default function CompleteButton({
               batchId: soro.length === 1 ? soro[0].batchId : "",
               quantity: soroQuantity ? soroQuantity.toString() : "",
             }],
+            MATERIAL: [],
           });
         });
     }
@@ -172,7 +176,7 @@ export default function CompleteButton({
     <div className="bg-white rounded-xl shadow-sm border-2 border-primary p-6">
       <h2 className="font-semibold text-gray-900 mb-2">Confirmar Baixa no Estoque</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Preencha a quantidade utilizada de cada item. Todos são obrigatórios.
+        Preencha a quantidade utilizada de cada item. Células, meio e soro são obrigatórios; materiais, se usados.
       </p>
 
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">{error}</div>}
@@ -189,16 +193,16 @@ export default function CompleteButton({
             <div key={cat.key} className="p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium text-gray-800">
-                  {cat.label} *
+                  {cat.label}{cat.required ? " *" : ""}
                 </p>
-                {catStock.length > 1 && (
+                {catStock.length > rows.length && (
                   <button
                     type="button"
                     onClick={() => addRow(cat.key)}
                     className="flex items-center gap-1 text-xs text-primary hover:underline"
                   >
                     <Plus size={12} />
-                    Adicionar lote
+                    {cat.key === "MATERIAL" ? "Adicionar material" : "Adicionar lote"}
                   </button>
                 )}
               </div>
@@ -209,12 +213,13 @@ export default function CompleteButton({
                 </p>
               ) : (
                 <div className="space-y-3">
+                  {rows.length === 0 && <p className="text-xs text-gray-400">Nenhum material utilizado.</p>}
                   {rows.map((row, idx) => {
                     const availableBatches = catStock.filter(
                       (s) => s.batchId === row.batchId || !usedBatchIds.includes(s.batchId)
                     );
                     const selected = catStock.find((s) => s.batchId === row.batchId);
-                    const showAutoSelect = availableBatches.length === 1 && rows.length === 1;
+                    const showAutoSelect = availableBatches.length === 1 && rows.length === 1 && cat.required;
 
                     return (
                       <div key={idx} className="flex gap-3 items-start">
@@ -223,7 +228,7 @@ export default function CompleteButton({
                             <label className="block text-xs text-gray-500 mb-1">Lote</label>
                             {showAutoSelect ? (
                               <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-800">
-                                {availableBatches[0].productName} – {availableBatches[0].batchNumber} ({availableBatches[0].balance} disp.)
+                                {lotLabel(availableBatches[0].batchNumber, availableBatches[0].productName)} ({availableBatches[0].balance} disp.)
                               </div>
                             ) : (
                               <select
@@ -234,7 +239,7 @@ export default function CompleteButton({
                                 <option value="">Selecione...</option>
                                 {availableBatches.map((s) => (
                                   <option key={s.batchId} value={s.batchId}>
-                                    {s.productName} – {s.batchNumber} ({s.balance} disp.)
+                                    {lotLabel(s.batchNumber, s.productName)} ({s.balance} disp.)
                                   </option>
                                 ))}
                               </select>
@@ -256,7 +261,7 @@ export default function CompleteButton({
                             )}
                           </div>
                         </div>
-                        {rows.length > 1 && (
+                        {(rows.length > 1 || !cat.required) && (
                           <button
                             type="button"
                             onClick={() => removeRow(cat.key, idx)}

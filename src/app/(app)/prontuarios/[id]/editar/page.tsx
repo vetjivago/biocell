@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { canEditRecord } from "@/lib/record-applications";
+import type { ProductCategory } from "@/lib/products";
 import EditRecordForm, { type StockLot } from "./EditRecordForm";
 
 export default async function EditarProntuarioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +66,7 @@ export default async function EditarProntuarioPage({ params }: { params: Promise
             id: a.id,
             number: a.number,
             date: day(a.date),
-            items: a.items.map((it) => ({ batchId: it.batchId, category: it.category as "CELULAS" | "SORO" | "MEIO", quantity: String(it.quantity) })),
+            items: a.items.map((it) => ({ batchId: it.batchId, category: it.category as ProductCategory, quantity: String(it.quantity) })),
             summary: [a.cells && `Células: ${a.cells}`, a.serum && `Soro: ${a.serum}`, a.medium && `Meio: ${a.medium}`].filter(Boolean).join(" · "),
           })),
           thawings: record.thawings.map((t) => ({

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { PATHOLOGIES } from "@/lib/pathologies";
 import { normalizeSpecies } from "@/lib/species";
+import { PRODUCT_CATEGORIES, lotLabel, type ProductCategory } from "@/lib/products";
 
-type Category = "CELULAS" | "SORO" | "MEIO";
+type Category = ProductCategory;
 interface Item { batchId: string; category: Category; quantity: string }
 interface App { id?: string; number: number; date: string; items: Item[]; summary?: string }
 interface Thaw { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string }
@@ -25,11 +26,7 @@ export interface EditRecordInitial {
   thawings: Thaw[];
 }
 
-const CATS: { key: Category; label: string; unit: string }[] = [
-  { key: "CELULAS", label: "Células", unit: "palhetas" },
-  { key: "SORO", label: "Soro", unit: "un." },
-  { key: "MEIO", label: "Meio", unit: "un." },
-];
+const CATS = PRODUCT_CATEGORIES;
 const OTHER = "__OTHER__";
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
@@ -46,10 +43,10 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
   const setApps = (fn: (apps: App[]) => App[]) => setForm((f) => ({ ...f, applications: fn(f.applications) }));
   const setThaws = (fn: (t: Thaw[]) => Thaw[]) => setForm((f) => ({ ...f, thawings: fn(f.thawings) }));
 
-  // Células só da espécie do paciente (lotes sem espécie identificável continuam aparecendo)
+  // Células e soro só da espécie do paciente (lotes sem espécie identificável continuam aparecendo)
   const lotsFor = (cat: Category) => stock.filter((l) => {
     if (l.category !== cat) return false;
-    if (cat !== "CELULAS") return true;
+    if (cat !== "CELULAS" && cat !== "SORO") return true;
     const kind = normalizeSpecies(l.species) || normalizeSpecies(l.productName);
     return !kind || kind === normalizeSpecies(form.patientSpecies);
   });
@@ -140,7 +137,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
           <h2 className="font-semibold text-gray-900">Aplicações</h2>
           {editable && form.applications.length < 6 && (
             <button type="button" className="text-sm text-primary hover:underline"
-              onClick={() => setApps((apps) => [...apps, { number: maxApp + 1, date: "", items: CATS.map((c) => ({ category: c.key, batchId: "", quantity: "" })) }])}>
+              onClick={() => setApps((apps) => [...apps, { number: maxApp + 1, date: "", items: CATS.filter((c) => c.key !== "MATERIAL").map((c) => ({ category: c.key, batchId: "", quantity: "" })) }])}>
               + Adicionar aplicação
             </button>
           )}
@@ -171,7 +168,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
                     {lots.length > 0 && (
                       <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline"
                         onClick={() => setApps((apps) => apps.map((x, j) => (j === ai ? { ...x, items: [...x.items, { category: c.key, batchId: "", quantity: "" }] } : x)))}>
-                        <Plus size={12} /> {rows.length ? "Outro lote" : "Adicionar lote"}
+                        <Plus size={12} /> {c.key === "MATERIAL" ? "Adicionar material" : rows.length ? "Outro lote" : "Adicionar lote"}
                       </button>
                     )}
                   </div>
@@ -187,7 +184,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
                           className="w-full sm:w-auto sm:flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded text-sm bg-white">
                           <option value="">Selecione o lote...</option>
                           {lots.filter((l) => l.batchId === it.batchId || !used.includes(l.batchId)).map((l) => (
-                            <option key={l.batchId} value={l.batchId}>Lote {l.batchNumber} – {l.productName} ({remaining(l.batchId, ai, ii)} disp.)</option>
+                            <option key={l.batchId} value={l.batchId}>{lotLabel(l.batchNumber, l.productName)} ({remaining(l.batchId, ai, ii)} disp.)</option>
                           ))}
                         </select>
                         <div className="flex-1 sm:flex-none sm:w-24">

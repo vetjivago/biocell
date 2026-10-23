@@ -71,7 +71,7 @@ export async function POST(
     });
     const currentBalance = transactions.reduce((sum, t) => sum + t.quantity, 0);
     const newBalance = currentBalance - item.quantity;
-    const categoryLabel = item.category === "MEIO" ? "meio" : item.category === "SORO" ? "soro" : "células";
+    const categoryLabel = item.category === "MEIO" ? "meio" : item.category === "SORO" ? "soro" : item.category === "MATERIAL" ? "material" : "células";
 
     inventoryOps.push({ batchId: item.batchId, quantity: item.quantity, newBalance, categoryLabel });
     balanceDetails.push({ batchId: item.batchId, quantity: item.quantity, newBalance, category: item.category });

@@ -6,17 +6,18 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { normalizeSpecies } from "@/lib/species";
 import { PATHOLOGIES } from "@/lib/pathologies";
+import { PRODUCT_CATEGORIES, lotLabel, type ProductCategory } from "@/lib/products";
 
 interface Unit { id: string; name: string; }
 interface AppItem { category: Category; batchId: string; quantity: string; }
 interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; items: AppItem[]; itemsInit?: boolean; readonly?: boolean; }
 interface StockItem { batchId: string; batchNumber: string; productName: string; category: string; balance: number; expirationDate: string | null; species: string | null; }
 
-type Category = "CELULAS" | "SORO" | "MEIO";
+type Category = ProductCategory;
 
 function lotsFor(stock: StockItem[], category: Category, patientSpecies: string) {
   const lots = stock.filter((s) => s.category === category);
-  if (category !== "CELULAS") return lots;
+  if (category !== "CELULAS" && category !== "SORO") return lots;
   const patientKind = normalizeSpecies(patientSpecies);
   if (!patientKind) return lots;
   return lots.filter((l) => {
@@ -24,18 +25,14 @@ function lotsFor(stock: StockItem[], category: Category, patientSpecies: string)
     return !kind || kind === patientKind;
   });
 }
-const ITEM_CATEGORIES: { key: Category; label: string; unit: string }[] = [
-  { key: "CELULAS", label: "Células", unit: "palhetas" },
-  { key: "SORO", label: "Soro", unit: "un." },
-  { key: "MEIO", label: "Meio", unit: "un." },
-];
+const ITEM_CATEGORIES = PRODUCT_CATEGORIES;
 interface ThawEntry { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string; readonly?: boolean; }
 
 
 
-// Uma linha por categoria; pré-seleciona o lote quando a unidade só tem um daquela categoria
+// Uma linha por categoria (materiais só quando adicionados); pré-seleciona o lote quando a unidade só tem um daquela categoria
 function defaultItemsFor(list: StockItem[], patientSpecies: string): AppItem[] {
-  return ITEM_CATEGORIES.map((c) => {
+  return ITEM_CATEGORIES.filter((c) => c.key !== "MATERIAL").map((c) => {
     const lots = lotsFor(list, c.key, patientSpecies);
     return { category: c.key, batchId: lots.length === 1 ? lots[0].batchId : "", quantity: "" };
   });
@@ -514,7 +511,7 @@ function NovoProntuarioForm() {
                           {lots.length > 0 && (
                             <button type="button" onClick={() => addItem(idx, cat.key)}
                               className="flex items-center gap-1 text-xs text-primary hover:underline">
-                              <Plus size={12} /> {rows.length === 0 ? "Adicionar lote" : "Outro lote"}
+                              <Plus size={12} /> {cat.key === "MATERIAL" ? "Adicionar material" : rows.length === 0 ? "Adicionar lote" : "Outro lote"}
                             </button>
                           )}
                         </div>
@@ -538,10 +535,10 @@ function NovoProntuarioForm() {
                                   <select value={it.batchId} onChange={(e) => updateItem(idx, k, "batchId", e.target.value)}
                                     aria-label={`Lote de ${cat.label.toLowerCase()}`}
                                     className="w-full sm:w-auto sm:flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded text-sm bg-white">
-                                    <option value="">Selecione o lote...</option>
+                                    <option value="">{cat.key === "MATERIAL" ? "Selecione o material..." : "Selecione o lote..."}</option>
                                     {lots.filter((l) => l.batchId === it.batchId || !usedHere.includes(l.batchId)).map((l) => (
                                       <option key={l.batchId} value={l.batchId}>
-                                        Lote {l.batchNumber} – {l.productName} ({remainingFor(l.batchId, { appIdx: idx, itemIdx: k })} disp.)
+                                        {lotLabel(l.batchNumber, l.productName)} ({remainingFor(l.batchId, { appIdx: idx, itemIdx: k })} disp.)
                                       </option>
                                     ))}
                                   </select>

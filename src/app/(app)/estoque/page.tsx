@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2 } from "lucide-react";
+import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe } from "lucide-react";
 import SupplyForm from "./SupplyForm";
-import { STANDARD_PRODUCTS } from "@/lib/products";
+import { NO_LOT, STANDARD_PRODUCTS } from "@/lib/products";
 
 const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a" };
 
@@ -67,7 +67,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     .sort((a, b) => a.unitName.localeCompare(b.unitName));
 
   // Um bloco por unidade: totais de cada produto e, ao abrir, os lotes
-  const CATEGORY_ORDER: Record<string, number> = { CELULAS: 0, MEIO: 1, SORO: 2 };
+  const CATEGORY_ORDER: Record<string, number> = { CELULAS: 0, MEIO: 1, SORO: 2, MATERIAL: 3 };
   const SPECIES_ORDER: Record<string, number> = { Canino: 0, Felino: 1, Equino: 2 };
   const total = (items: typeof stock, f: (s: (typeof stock)[number]) => boolean) => items.filter(f).reduce((t, s) => t + s.balance, 0);
   const unitBlocks = units
@@ -77,6 +77,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         .sort((a, b) =>
           (CATEGORY_ORDER[a.category] ?? 9) - (CATEGORY_ORDER[b.category] ?? 9)
           || (SPECIES_ORDER[a.species ?? ""] ?? 9) - (SPECIES_ORDER[b.species ?? ""] ?? 9)
+          || a.productName.localeCompare(b.productName)
           || (a.expirationDate?.getTime() ?? Infinity) - (b.expirationDate?.getTime() ?? Infinity));
       const cells = total(items, (s) => s.category === "CELULAS");
       const min = minStraws[u.id] ?? DEFAULT_MIN_STRAWS;
@@ -90,6 +91,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           .map((p) => ({ name: p.species!, value: total(items, (s) => s.category === "CELULAS" && s.species === p.species) })),
         meio: total(items, (s) => s.category === "MEIO"),
         soro: total(items, (s) => s.category === "SORO"),
+        material: total(items, (s) => s.category === "MATERIAL"),
       };
     })
     .filter((u) => u.items.length > 0)
@@ -118,7 +120,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Resumo: palhetas por espécie + insumos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
         {[
           ...STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS").map((p) => ({
             key: p.id, label: p.name, unit: p.unit, icon: Package, color: SPECIES_COLOR[p.species!],
@@ -126,6 +128,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           })),
           { key: "meio", label: "MEIO", unit: "unidades", icon: Beaker, color: "#2563eb", value: stock.filter((s) => s.category === "MEIO").reduce((sum, i) => sum + i.balance, 0) },
           { key: "soro", label: "SORO", unit: "unidades", icon: Droplets, color: "#7c3aed", value: stock.filter((s) => s.category === "SORO").reduce((sum, i) => sum + i.balance, 0) },
+          { key: "material", label: "MATERIAIS", unit: "unidades", icon: Syringe, color: "#64748b", value: stock.filter((s) => s.category === "MATERIAL").reduce((sum, i) => sum + i.balance, 0) },
           { key: "alertas", label: "Alertas ativos", unit: "", icon: AlertTriangle, color: "#f59e0b", value: activeAlerts },
         ].map((c) => (
           <div key={c.key} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
@@ -169,7 +172,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                   )}
                   <ChevronDown size={18} className="text-gray-400 shrink-0 transition-transform group-open:rotate-180" />
                 </div>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <div className={`rounded-lg p-3 ${u.low ? "bg-red-50" : "bg-green-50"}`}>
                     <p className="text-xs text-gray-600 flex items-center gap-1"><Package size={13} /> Palhetas</p>
                     <p className={`text-2xl sm:text-3xl font-bold ${u.low ? "text-red-600" : "text-gray-900"}`}>{u.cells}</p>
@@ -187,6 +190,11 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                   <div className="rounded-lg p-3 bg-purple-50">
                     <p className="text-xs text-gray-600 flex items-center gap-1"><Droplets size={13} /> Soro</p>
                     <p className="text-2xl sm:text-3xl font-bold text-gray-900">{u.soro}</p>
+                    <p className="text-xs text-gray-400 mt-1">unidades</p>
+                  </div>
+                  <div className="rounded-lg p-3 bg-slate-50">
+                    <p className="text-xs text-gray-600 flex items-center gap-1"><Syringe size={13} /> Materiais</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{u.material}</p>
                     <p className="text-xs text-gray-400 mt-1">unidades</p>
                   </div>
                 </div>
@@ -210,12 +218,13 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                               s.category === "CELULAS" ? "bg-green-100 text-green-700" :
                               s.category === "MEIO" ? "bg-blue-100 text-blue-700" :
-                              "bg-purple-100 text-purple-700"
+                              s.category === "SORO" ? "bg-purple-100 text-purple-700" :
+                              "bg-slate-100 text-slate-700"
                             }`}>
                               {s.productName}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-sm font-mono text-gray-600">{s.batchNumber}</td>
+                          <td className="px-4 py-2.5 text-sm font-mono text-gray-600">{s.batchNumber === NO_LOT ? "–" : s.batchNumber}</td>
                           <td className={`px-4 py-2.5 text-sm ${expired ? "text-red-600 font-medium" : "text-gray-600"}`}>
                             {s.expirationDate ? new Date(s.expirationDate).toLocaleDateString("pt-BR") : "–"}{expired ? " (vencido)" : ""}
                           </td>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, KeyRound, Trash2 } from "lucide-react";
+import { Copy, KeyRound, Mail, MessageCircle, Trash2 } from "lucide-react";
 import { ROLES, roleFlags, roleFromFlags, type Role } from "@/lib/roles";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 
@@ -14,10 +14,11 @@ interface Initial { id?: string; name: string; email: string; phone: string; rol
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
 
-// Senha provisória mostrada uma única vez, com botão de copiar
+// Senha provisória mostrada uma única vez: envia pronta pelo WhatsApp ou e-mail de quem criou, ou copia
 export function TempPasswordBox({ email, phone, password }: { email: string; phone: string; password: string }) {
   const [copied, setCopied] = useState(false);
   const login = [email && `E-mail: ${email}`, phone && `Celular: ${formatPhone(normalizePhone(phone)) || phone}`].filter(Boolean).join("\n");
+  const digits = normalizePhone(phone);
   const text = `Acesso BIO CELL\nEndereço: ${typeof window !== "undefined" ? window.location.origin : ""}\nEntre com o ${email && phone ? "e-mail ou o celular" : email ? "e-mail" : "celular"}:\n${login}\nSenha provisória: ${password}\n(no primeiro acesso o sistema pede para criar uma senha pessoal)`;
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm space-y-2">
@@ -28,6 +29,20 @@ export function TempPasswordBox({ email, phone, password }: { email: string; pho
         className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-amber-900 hover:bg-amber-100">
         <Copy size={14} /> {copied ? "Copiado!" : "Copiar mensagem para enviar à pessoa"}
       </button>
+      <div className="flex flex-wrap gap-2">
+        {digits && (
+          <a href={`https://wa.me/55${digits}?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25d366] text-white rounded-lg hover:opacity-90">
+            <MessageCircle size={14} /> Enviar pelo WhatsApp
+          </a>
+        )}
+        {email && (
+          <a href={`mailto:${email}?subject=${encodeURIComponent("Seu acesso ao sistema BIO CELL")}&body=${encodeURIComponent(text)}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg hover:opacity-90">
+            <Mail size={14} /> Enviar por e-mail
+          </a>
+        )}
+      </div>
     </div>
   );
 }

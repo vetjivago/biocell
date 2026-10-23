@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { CATEGORY_LABEL, NO_LOT } from "@/lib/products";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -48,7 +49,7 @@ export default async function ProntuarioDetailPage({
     CANCELLED: { label: "Cancelado", cls: "bg-gray-100 text-gray-800" },
   };
   const st = statusConfig[record.status] || statusConfig.OPEN;
-  const categoryLabel: Record<string, string> = { CELULAS: "Células", SORO: "Soro", MEIO: "Meio" };
+  const categoryLabel = CATEGORY_LABEL;
 
   // Lotes escolhidos nas aplicações, somados por lote, para pré-preencher a baixa
   const plannedMap = new Map<string, { batchId: string; category: string; quantity: number }>();
@@ -140,7 +141,7 @@ export default async function ProntuarioDetailPage({
                         <span className="text-xs font-semibold uppercase text-gray-500 w-16">{categoryLabel[it.category] || it.category}</span>
                         <span className="font-medium text-gray-800">{it.quantity}</span>
                         <span>{it.batch.product.name}</span>
-                        <span className="text-gray-400">Lote {it.batch.batchNumber}</span>
+                        {it.batch.batchNumber !== NO_LOT && <span className="text-gray-400">Lote {it.batch.batchNumber}</span>}
                       </li>
                     ))}
                   </ul>

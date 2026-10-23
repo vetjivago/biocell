@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, X, Loader2, PenLine } from "lucide-react";
-import { STANDARD_PRODUCTS } from "@/lib/products";
+import { Plus, X, Loader2, Trash2 } from "lucide-react";
+import { NO_LOT, PRODUCT_CATEGORIES, STANDARD_PRODUCTS, standardProduct } from "@/lib/products";
 
 type Unit = { id: string; name: string };
-type Batch = {
-  id: string;
-  batchNumber: string;
-  product: { id: string; name: string; code: string | null; species: string | null };
-};
+type Batch = { id: string; batchNumber: string; product: { id: string } };
+type Row = { productId: string; batchNumber: string; quantity: string };
 
+const emptyRow = (): Row => ({ productId: "", batchNumber: "", quantity: "" });
+const field = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary";
+
+// Abastecimento: vários itens do catálogo de uma vez (como na OS de reposição da UABC)
 export default function SupplyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,7 +20,6 @@ export default function SupplyForm() {
   const autoOpen = searchParams.get("supply") === "true";
 
   const [open, setOpen] = useState(autoOpen);
-  const [manual, setManual] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,10 +27,7 @@ export default function SupplyForm() {
   const [success, setSuccess] = useState("");
 
   const [unitId, setUnitId] = useState(preselectedUnitId);
-  const [batchId, setBatchId] = useState("");
-  const [productId, setProductId] = useState("");
-  const [batchNumber, setBatchNumber] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [reason, setReason] = useState("");
 
   useEffect(() => {
@@ -44,58 +41,63 @@ export default function SupplyForm() {
     });
   }, [open]);
 
+  const updateRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  function close() {
+    setOpen(false);
+    setError("");
+    setSuccess("");
+    setRows([emptyRow()]);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    const filled = rows.filter((r) => r.productId);
+    if (filled.length === 0) return setError("Adicione ao menos um produto");
+    for (const r of filled) {
+      const p = standardProduct(r.productId)!;
+      if (!(parseInt(r.quantity) > 0)) return setError(`${p.name}: quantidade deve ser maior que zero`);
+      if (p.category !== "MATERIAL" && !r.batchNumber.trim()) return setError(`${p.name}: informe o lote`);
+    }
+
     setLoading(true);
-
-    const qty = parseInt(quantity);
-    if (!qty || qty <= 0) {
-      setError("Quantidade deve ser maior que zero");
-      setLoading(false);
-      return;
-    }
-
-    const payload: Record<string, unknown> = {
-      unitId,
-      type: "RECEIPT",
-      quantity: qty,
-      reason: reason || "Abastecimento pela matriz",
-    };
-
-    if (manual) {
-      payload.productId = productId;
-      payload.batchNumber = batchNumber;
-    } else {
-      payload.batchId = batchId;
-    }
-
-    const res = await fetch("/api/inventory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok) {
-      setSuccess("Estoque atualizado com sucesso!");
-      setUnitId("");
-      setBatchId("");
-      setProductId("");
-      setBatchNumber("");
-      setQuantity("");
-      setReason("");
-      router.refresh();
-      setTimeout(() => {
-        setOpen(false);
-        setSuccess("");
-        setManual(false);
-      }, 1500);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Erro ao atualizar estoque");
+    // Um registro por item; os que deram certo saem da lista, os com erro ficam para corrigir
+    const failed: Row[] = [];
+    const errors: string[] = [];
+    for (const r of filled) {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unitId,
+          type: "RECEIPT",
+          productId: r.productId,
+          batchNumber: r.batchNumber,
+          quantity: parseInt(r.quantity),
+          reason: reason || "Abastecimento pela matriz",
+        }),
+      });
+      if (!res.ok) {
+        failed.push(r);
+        const data = await res.json().catch(() => ({}));
+        errors.push(`${standardProduct(r.productId)?.name}: ${data.error || "erro ao registrar"}`);
+      }
     }
     setLoading(false);
+    router.refresh();
+
+    if (failed.length > 0) {
+      setRows(failed);
+      setError(errors.join(" • "));
+      return;
+    }
+    setSuccess(`Abastecimento registrado (${filled.length} ${filled.length === 1 ? "item" : "itens"})!`);
+    setRows([emptyRow()]);
+    setReason("");
+    setTimeout(close, 1500);
   }
 
   if (!open) {
@@ -111,122 +113,78 @@ export default function SupplyForm() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div className="w-full bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="font-semibold text-gray-900">Abastecer Unidade</h2>
-        <button onClick={() => { setOpen(false); setError(""); setSuccess(""); setManual(false); }} className="text-gray-400 hover:text-gray-600">
+        <button onClick={close} className="text-gray-400 hover:text-gray-600" aria-label="Fechar">
           <X size={20} />
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-          <select
-            value={unitId}
-            onChange={(e) => setUnitId(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="">Selecione a unidade...</option>
-            {units.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {!manual ? (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">Produto / Lote</label>
-              <button
-                type="button"
-                onClick={() => setManual(true)}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <PenLine size={12} />
-                Lote novo
-              </button>
-            </div>
-            <select
-              value={batchId}
-              onChange={(e) => setBatchId(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Selecione o lote...</option>
-              {STANDARD_PRODUCTS.map((p) => {
-                const lots = batches.filter((b) => b.product.id === p.id);
-                return lots.length === 0 ? null : (
-                  <optgroup key={p.id} label={p.name}>
-                    {lots.map((b) => <option key={b.id} value={b.id}>{p.name} – Lote {b.batchNumber}</option>)}
-                  </optgroup>
-                );
-              })}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
+            <select value={unitId} onChange={(e) => setUnitId(e.target.value)} required className={field}>
+              <option value="">Selecione a unidade...</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
             </select>
           </div>
-        ) : (
-          <>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Produto</label>
-                <button
-                  type="button"
-                  onClick={() => setManual(false)}
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  Selecionar existente
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observação (opcional)</label>
+            <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex: OS de reposição 14/10" className={field} />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-gray-700">Itens enviados</p>
+          {rows.map((r, i) => {
+            const product = standardProduct(r.productId);
+            const isMaterial = product?.category === "MATERIAL";
+            const lots = batches.filter((b) => b.product.id === r.productId && b.batchNumber !== NO_LOT);
+            const taken = rows.filter((_, j) => j !== i).map((x) => x.productId);
+            return (
+              <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_12rem_7rem_auto] gap-2 items-start p-3 bg-gray-50 rounded-lg">
+                <select value={r.productId} onChange={(e) => updateRow(i, { productId: e.target.value, batchNumber: "" })}
+                  aria-label="Produto" className={`${field} bg-white`}>
+                  <option value="">Selecione o produto...</option>
+                  {PRODUCT_CATEGORIES.map((c) => (
+                    <optgroup key={c.key} label={c.label}>
+                      {STANDARD_PRODUCTS.filter((p) => p.category === c.key && !p.legacy).map((p) => (
+                        <option key={p.id} value={p.id} disabled={taken.includes(p.id) && p.category === "MATERIAL"}>
+                          {p.name}{p.presentation ? ` (${p.presentation})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <div>
+                  <input type="text" value={r.batchNumber} onChange={(e) => updateRow(i, { batchNumber: e.target.value })}
+                    list={`lots-${i}`} disabled={!product}
+                    placeholder={isMaterial ? "Lote (opcional)" : "Lote"} aria-label="Lote"
+                    className={`${field} bg-white disabled:bg-gray-100`} />
+                  <datalist id={`lots-${i}`}>
+                    {lots.map((b) => <option key={b.id} value={b.batchNumber} />)}
+                  </datalist>
+                </div>
+                <input type="number" min="1" inputMode="numeric" value={r.quantity} onChange={(e) => updateRow(i, { quantity: e.target.value })}
+                  placeholder={product?.unit ?? "Qtd"} aria-label="Quantidade" className={`${field} bg-white`} />
+                <button type="button" onClick={() => setRows((rs) => (rs.length === 1 ? [emptyRow()] : rs.filter((_, j) => j !== i)))}
+                  aria-label="Remover item" className="p-2 text-gray-400 hover:text-red-500 justify-self-end">
+                  <Trash2 size={16} />
                 </button>
               </div>
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Selecione o produto...</option>
-                {STANDARD_PRODUCTS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Lote (novo)</label>
-              <input
-                type="text"
-                value={batchNumber}
-                onChange={(e) => setBatchNumber(e.target.value)}
-                required
-                placeholder="Ex: 04.001.2026"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
-          </>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
-          <input
-            type="number"
-            min="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            required
-            placeholder="Ex: 10"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
+            );
+          })}
+          <button type="button" onClick={() => setRows((rs) => [...rs, emptyRow()])}
+            className="flex items-center gap-1 text-sm text-primary hover:underline">
+            <Plus size={14} /> Adicionar item
+          </button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Observação (opcional)</label>
-          <input
-            type="text"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Ex: Envio pedido #123"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-
-        <div className="sm:col-span-2 flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={loading}
