@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateTempPassword, getSession, hashPassword } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { assignableRoles, canManageUsers, isRole } from "@/lib/roles";
+import { sendAccessEmail } from "@/lib/mailer";
 import { loginTakenError, manageableUsersWhere, parseLoginFields, validateUnitIds } from "@/lib/users";
 
 export async function GET() {
@@ -61,5 +62,6 @@ export async function POST(request: NextRequest) {
     return created;
   });
 
-  return Response.json({ ...user, tempPassword }, { status: 201 });
+  const emailSent = await sendAccessEmail(user, tempPassword, new URL(request.url).origin, false);
+  return Response.json({ ...user, tempPassword, emailSent }, { status: 201 });
 }

@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { generateTempPassword, getSession, hashPassword } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { getManageableUser } from "@/lib/users";
+import { sendAccessEmail } from "@/lib/mailer";
 
 // Gera nova senha provisória (a pessoa troca no próximo login)
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
@@ -19,5 +20,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     prisma.user.update({ where: { id }, data: { passwordHash: await hashPassword(tempPassword), mustChangePassword: true } }),
     prisma.auditLog.create({ data: { userId: session.id, action: "RESET_PASSWORD", entity: "User", entityId: id } }),
   ]);
-  return Response.json({ tempPassword });
+  const emailSent = await sendAccessEmail(access.user, tempPassword, new URL(request.url).origin, true);
+  return Response.json({ tempPassword, emailSent });
 }

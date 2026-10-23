@@ -15,7 +15,7 @@ const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
 
 // Senha provisória mostrada uma única vez: envia pronta pelo WhatsApp ou e-mail de quem criou, ou copia
-export function TempPasswordBox({ email, phone, password }: { email: string; phone: string; password: string }) {
+export function TempPasswordBox({ email, phone, password, emailSent = false }: { email: string; phone: string; password: string; emailSent?: boolean }) {
   const [copied, setCopied] = useState(false);
   const login = [email && `E-mail: ${email}`, phone && `Celular: ${formatPhone(normalizePhone(phone)) || phone}`].filter(Boolean).join("\n");
   const digits = normalizePhone(phone);
@@ -24,6 +24,9 @@ export function TempPasswordBox({ email, phone, password }: { email: string; pho
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm space-y-2">
       <p className="font-semibold text-amber-900 flex items-center gap-2"><KeyRound size={16} /> Senha provisória (anote ou copie agora — ela não aparece de novo)</p>
       <p className="font-mono text-lg tracking-wider text-gray-900 select-all">{password}</p>
+      {emailSent && (
+        <p className="flex items-center gap-1.5 text-green-700 font-medium"><Mail size={14} /> Acesso enviado automaticamente para {email}</p>
+      )}
       <button type="button"
         onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); }}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-amber-900 hover:bg-amber-100">
@@ -63,6 +66,7 @@ export default function UserForm({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [temp, setTemp] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   const visibleUnits = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -104,6 +108,7 @@ export default function UserForm({
     if (!res.ok) return setError(data.error || "Erro ao salvar");
     if (!isEdit) {
       setTemp(data.tempPassword);
+      setEmailSent(!!data.emailSent);
       return;
     }
     setSaved(true);
@@ -127,13 +132,14 @@ export default function UserForm({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setError(data.error || "Erro ao redefinir");
     setTemp(data.tempPassword);
+    setEmailSent(!!data.emailSent);
   }
 
   if (temp && !isEdit) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
         <p className="text-sm text-gray-700">Acesso criado para <strong>{form.name}</strong> ({[form.email, form.phone].filter(Boolean).join(" · ")}).</p>
-        <TempPasswordBox email={form.email} phone={form.phone} password={temp} />
+        <TempPasswordBox email={form.email} phone={form.phone} password={temp} emailSent={emailSent} />
         <div className="flex gap-2">
           <button type="button" onClick={() => router.push("/usuarios")} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Voltar para a lista</button>
           <button type="button" onClick={() => { setTemp(null); setForm({ ...initial }); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Criar outro acesso</button>
@@ -221,7 +227,7 @@ export default function UserForm({
         </label>
       )}
 
-      {temp && isEdit && <TempPasswordBox email={form.email} phone={form.phone} password={temp} />}
+      {temp && isEdit && <TempPasswordBox email={form.email} phone={form.phone} password={temp} emailSent={emailSent} />}
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
       {saved && <div className="bg-green-50 text-green-700 px-4 py-3 rounded-lg text-sm">Alterações salvas.</div>}
 
