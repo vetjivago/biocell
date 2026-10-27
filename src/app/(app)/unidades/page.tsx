@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canManageUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { MapPin, Phone, Plus } from "lucide-react";
@@ -7,7 +8,7 @@ export default async function UnidadesPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = canManageUnits(session.role);
   // Matriz vê também as desativadas (no fim da lista) para poder reativar
   const units = await prisma.unit.findMany({
     where: isAdmin ? {} : { id: { in: session.unitIds }, active: true },

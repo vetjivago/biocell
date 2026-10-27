@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
+import { checkApplications, parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
 import { nextRecordSerial } from "@/lib/record-serial";
 import { Prisma } from "@prisma/client";
 
@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   const unitId = searchParams.get("unitId");
 
   const isAdmin = session.role === "ADMIN";
+  if (unitId && !isAdmin && !session.unitIds.includes(unitId)) return Response.json([], { status: 403 });
   const where = {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
     ...(status ? { status } : {}),
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
   }
 
   const validApps = parseApplications(applications);
+  const appError = checkApplications(validApps);
+  if (appError) return Response.json({ error: appError }, { status: 400 });
   const lots = await validateLots(validApps, unitId);
   if ("error" in lots) return Response.json({ error: lots.error }, { status: 400 });
   const { batchInfo } = lots;
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
               medicalRecordId: mr.id,
               number: a.number,
               date: a.date ? new Date(a.date) : null,
+              preparedBy: a.preparedBy,
               cells: summarize(a.items, "CELULAS", batchInfo, a.cells),
               serum: summarize(a.items, "SORO", batchInfo, a.serum),
               medium: summarize(a.items, "MEIO", batchInfo, a.medium),

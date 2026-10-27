@@ -7,16 +7,20 @@ import { ArrowLeft, Pencil } from "lucide-react";
 import { canEditRecord } from "@/lib/record-applications";
 import DeleteRecordButton from "./DeleteRecordButton";
 import CompleteButton from "./CompleteButton";
+import RecordPhotos from "./RecordPhotos";
 
 export default async function ProntuarioDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ fotos?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
 
   const { id } = await params;
+  const { fotos } = await searchParams;
 
   const record = await prisma.medicalRecord.findUnique({
     where: { id },
@@ -29,6 +33,7 @@ export default async function ProntuarioDetailPage({
         include: { items: { include: { batch: { include: { product: { select: { name: true } } } } } } },
       },
       thawings: { orderBy: { number: "asc" } },
+      attachments: { select: { id: true, fileName: true, mimeType: true }, orderBy: { createdAt: "asc" } },
       procedures: { orderBy: { date: "desc" } },
       serviceOrderApplication: { select: { number: true, serviceOrder: { select: { id: true, serialNumber: true } } } },
       inventoryTransactions: {
@@ -97,7 +102,7 @@ export default async function ProntuarioDetailPage({
           <div><p className="text-gray-500">Espécie/Raça</p><p className="font-medium">{record.patient.species}{record.patient.breed ? ` – ${record.patient.breed}` : ""}</p></div>
           <div><p className="text-gray-500">Peso</p><p className="font-medium">{record.patient.weight ? `${record.patient.weight} kg` : "–"}</p></div>
           <div><p className="text-gray-500">Responsável</p><p className="font-medium">{record.patient.ownerName}</p></div>
-          <div><p className="text-gray-500">Veterinário</p><p className="font-medium">{record.patient.veterinarian || "–"}</p></div>
+          <div><p className="text-gray-500">Veterinário afiliado</p><p className="font-medium">{record.patient.veterinarian || "–"}</p></div>
           <div><p className="text-gray-500">Clínica</p><p className="font-medium">{record.patient.clinic || "–"}</p></div>
           <div><p className="text-gray-500">Soro Coletado</p><p className="font-medium">{record.serumCollected ? "Sim" : "Não"}</p></div>
           <div><p className="text-gray-500">Data</p><p className="font-medium">{new Date(record.requestDate).toLocaleDateString("pt-BR")}</p></div>
@@ -126,6 +131,7 @@ export default async function ProntuarioDetailPage({
                 <div className="flex items-center gap-4 flex-wrap">
                   <span className="font-medium text-gray-700">{a.number}ª</span>
                   <span className="text-gray-600">{a.date ? new Date(a.date).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "–"}</span>
+                  <span className="text-gray-600">Preparo: <span className="font-medium text-gray-800">{a.preparedBy || "–"}</span></span>
                   {a.items.length === 0 && (
                     <>
                       <span className="text-gray-600">Células: {a.cells || "–"}</span>
@@ -188,6 +194,8 @@ export default async function ProntuarioDetailPage({
           </div>
         </div>
       )}
+
+      <RecordPhotos recordId={record.id} photos={record.attachments} canChange={canEdit || record.status === "OPEN"} uploadFailed={fotos === "erro"} />
 
       {/* Botão de Concluir */}
       {record.status === "OPEN" && (

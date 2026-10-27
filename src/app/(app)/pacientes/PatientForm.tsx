@@ -107,9 +107,9 @@ export default function PatientForm({ patientId, initial }: { patientId?: string
       </div>
 
       <hr className="my-2" />
-      <h3 className="font-medium text-gray-800 text-sm">Veterinário / Clínica</h3>
+      <h3 className="font-medium text-gray-800 text-sm">Veterinário afiliado / Clínica</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div><label className={label}>Veterinário</label><input value={form.veterinarian} onChange={set("veterinarian")} className={input} /></div>
+        <div><label className={label}>Veterinário afiliado</label><input value={form.veterinarian} onChange={set("veterinarian")} className={input} /></div>
         <div><label className={label}>Clínica</label><input value={form.clinic} onChange={set("clinic")} className={input} /></div>
       </div>
 

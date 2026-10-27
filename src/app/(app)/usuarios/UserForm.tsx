@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, KeyRound, Mail, MessageCircle, Trash2 } from "lucide-react";
-import { ROLES, roleFlags, roleFromFlags, type Role } from "@/lib/roles";
+import { ROLES, roleFlags, roleFromFlags, seesAllUnits, type Role } from "@/lib/roles";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 
 const TEAM_ROLES: Role[] = ["PROFESSIONAL", "LAB", "PROFESSIONAL_LAB"];
@@ -72,7 +72,7 @@ export default function UserForm({
     const q = filter.trim().toLowerCase();
     return q ? units.filter((u) => `${u.name} ${u.city} ${u.state}`.toLowerCase().includes(q)) : units;
   }, [units, filter]);
-  const needsUnits = form.role !== "ADMIN";
+  const needsUnits = !seesAllUnits(form.role);
   const flags = roleFlags(form.role);
 
   // Desmarcar a única caixa marcada não deixa a pessoa sem função

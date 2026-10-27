@@ -44,6 +44,11 @@ export async function POST(
     return Response.json({ error: "Sem permissão" }, { status: 403 });
   }
 
+  // Foto das palhetas é obrigatória (substitui as palhetas coladas no prontuário de papel)
+  if ((await prisma.medicalRecordAttachment.count({ where: { medicalRecordId: id } })) === 0) {
+    return Response.json({ error: "Anexe a foto das palhetas antes de concluir o atendimento" }, { status: 400 });
+  }
+
   // Validate balances for all items
   for (const item of consumptionItems) {
     const transactions = await prisma.inventoryTransaction.findMany({

@@ -204,6 +204,7 @@ model MedicalRecord {
   procedures        Procedure[]
   inventoryTransactions InventoryTransaction[]
   serviceOrderApplication ServiceOrderApplication?
+  attachments       MedicalRecordAttachment[]
 
   @@index([patientId])
   @@index([unitId])
@@ -221,6 +222,8 @@ model Application {
   serum           String?
   medium          String?
   notes           String?
+  // Quem preparou as células desta aplicação
+  preparedBy      String?
 
   items           ApplicationItem[]
 
@@ -477,4 +480,19 @@ model ServiceOrderAttachment {
   createdAt      DateTime     @default(now())
 
   @@index([serviceOrderId])
+}
+
+// Fotos das palhetas (antes coladas no prontuário de papel)
+model MedicalRecordAttachment {
+  id              String        @id @default(cuid())
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  fileName        String
+  mimeType        String
+  size            Int
+  data            Bytes
+  uploadedById    String
+  createdAt       DateTime      @default(now())
+
+  @@index([medicalRecordId])
 }

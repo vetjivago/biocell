@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { canManageUsers, roleLabel } from "@/lib/roles";
+import { canManageUsers, roleLabel, seesAllUnits } from "@/lib/roles";
 import { manageableUsersWhere } from "@/lib/users";
 
 export default async function UsuariosPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -32,7 +32,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {users.length} acesso(s){session.role === "ADMIN" ? "" : " da(s) sua(s) unidade(s)"}
+            {users.length} acesso(s){seesAllUnits(session.role) ? "" : " da(s) sua(s) unidade(s)"}
           </p>
         </div>
         <Link href="/usuarios/novo" className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium">
@@ -64,7 +64,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">{roleLabel(u.role)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {u.role === "ADMIN" ? "Todas" : u.units.map((x) => x.unit.name.replace(/^UABC\s+/i, "")).join(", ") || "–"}
+                  {seesAllUnits(u.role) ? "Todas" : u.units.map((x) => x.unit.name.replace(/^UABC\s+/i, "")).join(", ") || "–"}
                 </td>
                 <td className="px-4 py-3">
                   {!u.active ? (

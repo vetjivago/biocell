@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateTempPassword, getSession, hashPassword } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { assignableRoles, canManageUsers, isRole } from "@/lib/roles";
+import { assignableRoles, canManageUsers, isRole, seesAllUnits } from "@/lib/roles";
 import { sendAccessEmail } from "@/lib/mailer";
 import { loginTakenError, manageableUsersWhere, parseLoginFields, validateUnitIds } from "@/lib/users";
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
   const units = await validateUnitIds(session, body.unitIds ?? []);
   if ("error" in units) return Response.json({ error: units.error }, { status: 400 });
-  if (body.role !== "ADMIN" && units.ids.length === 0) {
+  if (!seesAllUnits(body.role) && units.ids.length === 0) {
     return Response.json({ error: "Escolha ao menos uma unidade" }, { status: 400 });
   }
   const taken = await loginTakenError({ email, phone });

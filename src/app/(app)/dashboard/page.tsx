@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import {
   Building2,
@@ -13,7 +14,7 @@ import Link from "next/link";
 import { syncOpenLowStockAlerts } from "@/lib/stock-alerts";
 
 async function getDashboardData(session: { role: string; unitIds: string[] }) {
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = seesAllUnits(session.role);
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
   await syncOpenLowStockAlerts(isAdmin ? undefined : session.unitIds);
 
@@ -83,7 +84,7 @@ export default async function DashboardPage() {
 
   const data = await getDashboardData(session);
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = seesAllUnits(session.role);
   const totalStock = data.stockByUnit.reduce((sum, s) => sum + s.totalStraws, 0);
 
   // Matriz: só unidades ativas no topo (clicável); o restante fica nos quadros abaixo

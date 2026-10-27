@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { canManageUnits } from "@/lib/roles";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -7,7 +8,7 @@ import UnitForm from "../UnitForm";
 export default async function NovaUnidadePage() {
   const session = await getSession();
   if (!session) return null;
-  if (session.role !== "ADMIN") notFound();
+  if (!canManageUnits(session.role)) notFound();
 
   return (
     <div className="max-w-3xl">

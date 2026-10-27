@@ -1,9 +1,11 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { normalizePhone } from "./phone";
+import { canOpenPage, canWriteApi, homePage } from "./roles";
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "biocell-dev-secret"
@@ -58,6 +60,21 @@ const loadUser = cache(async (id: string): Promise<SessionUser | null> => {
 });
 
 export async function getSession(): Promise<SessionUser | null> {
+  const user = await readSession();
+  if (!user) return null;
+  // Perfis restritos: telas fora da lista voltam para a inicial; alterações fora da lista são negadas
+  const h = await headers();
+  const path = h.get("x-pathname");
+  if (path?.startsWith("/api/")) {
+    const method = h.get("x-method") || "GET";
+    if (method !== "GET" && method !== "HEAD" && !canWriteApi(user.role, path)) return null;
+  } else if (path && !canOpenPage(user.role, path)) {
+    redirect(homePage(user.role));
+  }
+  return user;
+}
+
+async function readSession(): Promise<SessionUser | null> {
   // App mobile envia "Authorization: Bearer <token>"; o webapp usa o cookie
   const authHeader = (await headers()).get("authorization");
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;

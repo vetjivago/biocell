@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { normalizeSpecies } from "@/lib/species";
 import { PATHOLOGIES } from "@/lib/pathologies";
 import { PRODUCT_CATEGORIES, lotLabel, type ProductCategory } from "@/lib/products";
+import { compressImage } from "@/lib/compress-image";
 
 interface Unit { id: string; name: string; }
 interface AppItem { category: Category; batchId: string; quantity: string; }
-interface AppEntry { number: number; date: string; cells: string; serum: string; medium: string; items: AppItem[]; itemsInit?: boolean; readonly?: boolean; }
+interface AppEntry { number: number; date: string; preparedBy?: string; cells: string; serum: string; medium: string; items: AppItem[]; itemsInit?: boolean; readonly?: boolean; }
 interface StockItem { batchId: string; batchNumber: string; productName: string; category: string; balance: number; expirationDate: string | null; species: string | null; }
 
 type Category = ProductCategory;
@@ -44,7 +45,7 @@ function NovoProntuarioForm() {
   const patientId = searchParams.get("patientId");
   const osAppId = searchParams.get("osApp");
   const [osApp, setOsApp] = useState<{
-    id: string; number: number; status: string; medicalRecordId: string | null; veterinarian: string | null; technicalNotes: string | null;
+    id: string; number: number; status: string; medicalRecordId: string | null; date: string | null; veterinarian: string | null; technicalNotes: string | null;
     applicationRoute: string | null; cellQuantity: string | null; preparation: string | null;
     serviceOrder: { id: string; serialNumber: string; patientId: string; disease: string | null };
   } | null>(null);
@@ -63,6 +64,7 @@ function NovoProntuarioForm() {
     donors: "", serumCollected: false,
   });
   const [stock, setStock] = useState<StockItem[] | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   // Cópia do estoque para os callbacks assíncronos (o paciente e o estoque podem chegar em qualquer ordem)
   const stockRef = useRef<StockItem[] | null>(null);
   const [applications, setApplications] = useState<AppEntry[]>([
@@ -95,7 +97,9 @@ function NovoProntuarioForm() {
         setIsExistingPatient(true);
         const p = data.patient;
         const lr = data.lastRecord;
-        const pathology = osDisease || lr?.pathology || "";
+        // Doença da OS na grafia da lista, quando bate (ex.: "doença renal crônica")
+        const rawPathology = (osDisease || lr?.pathology || "").trim();
+        const pathology = PATHOLOGIES.find((x) => x.toLowerCase() === rawPathology.toLowerCase()) || rawPathology;
         if (pathology && !PATHOLOGIES.includes(pathology)) {
           setIsCustomPathology(true);
         }
@@ -105,12 +109,12 @@ function NovoProntuarioForm() {
           patientBreed: p.breed || "",
           patientWeight: p.weight?.toString() || "",
           ownerName: p.ownerName,
-          veterinarian: p.veterinarian || "",
+          veterinarian: (os && !os.error && os.veterinarian) || p.veterinarian || "",
           clinic: p.clinic || "",
           unitId: p.unitId,
           pathology,
-          // Via e quantidade informadas na OS valem para esta aplicação
-          cellQuantity: (os && !os.error && os.cellQuantity) || "",
+          // Protocolo da OS vale para esta aplicação (sem OS: repete o do último prontuário)
+          cellQuantity: (os && !os.error && os.cellQuantity) || lr?.cellQuantity || "",
           applicationRoute: (os && !os.error && os.applicationRoute) || lr?.applicationRoute || "",
           donors: lr?.donors || "",
           serumCollected: lr?.serumCollected || false,
@@ -120,11 +124,12 @@ function NovoProntuarioForm() {
           ...a, items: [], readonly: true,
         }));
         const nextAppNum = prevApps.length > 0 ? Math.max(...prevApps.map((a: AppEntry) => a.number)) + 1 : 1;
+        const osDate = os && !os.error && os.date ? String(os.date).slice(0, 10) : "";
         setApplications([
           ...prevApps,
           stockRef.current
-            ? { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: defaultItemsFor(stockRef.current, p.species), itemsInit: true }
-            : { number: nextAppNum, date: "", cells: "", serum: "", medium: "", items: [] },
+            ? { number: nextAppNum, date: osDate, preparedBy: "", cells: "", serum: "", medium: "", items: defaultItemsFor(stockRef.current, p.species), itemsInit: true }
+            : { number: nextAppNum, date: osDate, preparedBy: "", cells: "", serum: "", medium: "", items: [] },
         ]);
 
         const prevThaws: ThawEntry[] = (data.previousThawings || []).map((t: ThawEntry) => ({
@@ -159,7 +164,7 @@ function NovoProntuarioForm() {
   }, [form.unitId, species]);
 
   function newApplication(number: number): AppEntry {
-    return { number, date: "", cells: "", serum: "", medium: "", items: stock ? defaultItemsFor(stock, form.patientSpecies) : [], itemsInit: !!stock };
+    return { number, date: "", preparedBy: "", cells: "", serum: "", medium: "", items: stock ? defaultItemsFor(stock, form.patientSpecies) : [], itemsInit: !!stock };
   }
 
   function updateItem(appIdx: number, itemIdx: number, field: "batchId" | "quantity", value: string) {
@@ -209,19 +214,28 @@ function NovoProntuarioForm() {
     e.preventDefault();
     setLoading(true);
 
+    const fail = (msg: string) => {
+      setError(msg);
+      setLoading(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
     for (const a of applications.filter((x) => !x.readonly)) {
       if (a.items.some((it) => Boolean(it.batchId) !== (parseInt(it.quantity) > 0))) {
-        setError(`${a.number}ª aplicação: informe lote e quantidade em cada linha (ou remova a linha)`);
-        setLoading(false);
-        return;
+        return fail(`${a.number}ª aplicação: informe lote e quantidade em cada linha (ou remova a linha)`);
       }
+      if (!a.items.some((it) => it.category === "SORO" && it.batchId && parseInt(it.quantity) > 0)) {
+        return fail(`${a.number}ª aplicação: informe o lote do soro`);
+      }
+      if (!a.preparedBy?.trim()) return fail(`${a.number}ª aplicação: informe o responsável pelo preparo`);
     }
+    if (photos.length === 0) return fail("Anexe a foto das palhetas");
 
     const newApps = applications
       .filter((a) => !a.readonly)
       .map((a) => ({
         number: a.number,
         date: a.date,
+        preparedBy: a.preparedBy,
         items: a.items
           .filter((it) => it.batchId && parseInt(it.quantity) > 0)
           .map((it) => ({ batchId: it.batchId, category: it.category, quantity: parseInt(it.quantity) })),
@@ -253,7 +267,15 @@ function NovoProntuarioForm() {
 
     if (res.ok) {
       const record = await res.json();
-      router.push(`/prontuarios/${record.id}`);
+      // Fotos das palhetas vão depois do prontuário criado; se alguma falhar, dá para anexar na tela do prontuário
+      let failed = 0;
+      for (const photo of photos) {
+        const body = new FormData();
+        body.append("file", await compressImage(photo));
+        const up = await fetch(`/api/medical-records/${record.id}/attachments`, { method: "POST", body }).catch(() => null);
+        if (!up?.ok) failed++;
+      }
+      router.push(`/prontuarios/${record.id}${failed ? "?fotos=erro" : ""}`);
     } else {
       const data = await res.json().catch(() => ({ error: "Erro ao registrar" }));
       setError(data.error || "Erro ao registrar prontuário");
@@ -305,7 +327,7 @@ function NovoProntuarioForm() {
       {osApp && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm mb-4">
           Preenchendo a partir da <Link href={`/ordens-servico/${osApp.serviceOrder.id}`} className="font-semibold underline">OS nº {osApp.serviceOrder.serialNumber}</Link> – {osApp.number}ª aplicação
-          {osApp.veterinarian ? ` · Veterinário: ${osApp.veterinarian}` : ""}
+          {osApp.veterinarian ? ` · Veterinário afiliado: ${osApp.veterinarian}` : ""}
           {(osApp.applicationRoute || osApp.cellQuantity) && (
             <span className="block mt-1"><strong>Via:</strong> {osApp.applicationRoute || "–"} · <strong>Quantidade de células:</strong> {osApp.cellQuantity || "–"}</span>
           )}
@@ -375,11 +397,11 @@ function NovoProntuarioForm() {
                 placeholder="Nome do tutor" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Veterinário</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Veterinário afiliado</label>
               <input value={form.veterinarian} onChange={(e) => update("veterinarian", e.target.value)}
                 readOnly={isExistingPatient}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm read-only:bg-gray-50 read-only:text-gray-600"
-                placeholder="Nome do veterinário" />
+                placeholder="Nome do veterinário afiliado" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Clínica</label>
@@ -494,10 +516,18 @@ function NovoProntuarioForm() {
                       className="text-xs text-gray-400 hover:text-red-500">Remover</button>
                   )}
                 </div>
-                <div className="mb-3 sm:w-1/2">
-                  <label className="block text-xs text-gray-500 mb-1">Data</label>
-                  <input type="date" value={app.date} onChange={(e) => updateApp(idx, "date", e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Data</label>
+                    <input type="date" value={app.date} onChange={(e) => updateApp(idx, "date", e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Responsável pelo preparo *</label>
+                    <input value={app.preparedBy ?? ""} onChange={(e) => updateApp(idx, "preparedBy", e.target.value)}
+                      required placeholder="Quem preparou as células"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -507,7 +537,7 @@ function NovoProntuarioForm() {
                     return (
                       <div key={cat.key} className="bg-white border border-gray-200 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{cat.label}</p>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{cat.label}{cat.key === "SORO" ? " * (lote obrigatório)" : ""}</p>
                           {lots.length > 0 && (
                             <button type="button" onClick={() => addItem(idx, cat.key)}
                               className="flex items-center gap-1 text-xs text-primary hover:underline">
@@ -638,6 +668,28 @@ function NovoProntuarioForm() {
         {error && (
           <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
         )}
+
+        {/* Foto das palhetas (no papel, as palhetas eram coladas no prontuário) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="font-semibold text-gray-900 mb-1">Foto das palhetas *</h2>
+          <p className="text-sm text-gray-500 mb-3">Tire uma foto das palhetas utilizadas e anexe aqui. Obrigatório.</p>
+          {photos.length > 0 && (
+            <ul className="mb-3 space-y-1">
+              {photos.map((f, i) => (
+                <li key={i} className="flex items-center justify-between gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="truncate">{f.name}</span>
+                  <button type="button" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} aria-label="Remover foto"
+                    className="text-gray-400 hover:text-red-500"><X size={16} /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <label className="inline-flex items-center gap-2 px-4 py-2 border border-primary text-primary rounded-lg text-sm font-medium cursor-pointer hover:bg-primary/5">
+            <Camera size={16} /> {photos.length ? "Adicionar outra foto" : "Tirar / escolher foto"}
+            <input type="file" accept="image/*,application/pdf" multiple className="hidden"
+              onChange={(e) => { const files = Array.from(e.target.files || []); setPhotos((ps) => [...ps, ...files]); e.target.value = ""; }} />
+          </label>
+        </div>
 
         <button type="submit" disabled={loading}
           className="w-full bg-primary hover:bg-primary-light text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 text-lg">

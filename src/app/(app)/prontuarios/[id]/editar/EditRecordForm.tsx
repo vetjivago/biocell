@@ -9,7 +9,7 @@ import { PRODUCT_CATEGORIES, lotLabel, type ProductCategory } from "@/lib/produc
 
 type Category = ProductCategory;
 interface Item { batchId: string; category: Category; quantity: string }
-interface App { id?: string; number: number; date: string; items: Item[]; summary?: string }
+interface App { id?: string; number: number; date: string; preparedBy: string; items: Item[]; summary?: string }
 interface Thaw { number: number; thawedStraws: string; thawedMeio: string; thawedSoro: string; retrievalLocation: string }
 export interface StockLot { batchId: string; batchNumber: string; productName: string; category: string; species: string | null; balance: number }
 
@@ -69,6 +69,10 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
       if (editable && a.items.some((it, ii) => it.batchId && parseInt(it.quantity) > remaining(it.batchId, ai, ii))) {
         return setError(`${a.number}ª aplicação: quantidade acima do disponível no lote`);
       }
+      if (editable && !a.items.some((it) => it.category === "SORO" && it.batchId && parseInt(it.quantity) > 0)) {
+        return setError(`${a.number}ª aplicação: informe o lote do soro`);
+      }
+      if (!a.preparedBy.trim()) return setError(`${a.number}ª aplicação: informe o responsável pelo preparo`);
     }
     setSaving(true);
     setError("");
@@ -82,7 +86,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
         donors: form.donors,
         serumCollected: form.serumCollected,
         applications: form.applications.map((a) => ({
-          id: a.id, number: a.number, date: a.date || null,
+          id: a.id, number: a.number, date: a.date || null, preparedBy: a.preparedBy,
           items: a.items.filter((it) => it.batchId).map((it) => ({ batchId: it.batchId, category: it.category, quantity: parseInt(it.quantity) })),
         })),
         thawings: form.thawings,
@@ -137,7 +141,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
           <h2 className="font-semibold text-gray-900">Aplicações</h2>
           {editable && form.applications.length < 6 && (
             <button type="button" className="text-sm text-primary hover:underline"
-              onClick={() => setApps((apps) => [...apps, { number: maxApp + 1, date: "", items: CATS.filter((c) => c.key !== "MATERIAL").map((c) => ({ category: c.key, batchId: "", quantity: "" })) }])}>
+              onClick={() => setApps((apps) => [...apps, { number: maxApp + 1, date: "", preparedBy: "", items: CATS.filter((c) => c.key !== "MATERIAL").map((c) => ({ category: c.key, batchId: "", quantity: "" })) }])}>
               + Adicionar aplicação
             </button>
           )}
@@ -151,10 +155,18 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
                 <button type="button" onClick={() => setApps((apps) => apps.filter((_, j) => j !== ai))} className="text-xs text-gray-400 hover:text-red-500">Remover aplicação</button>
               )}
             </div>
-            <div className="sm:w-1/2">
-              <label className="block text-xs text-gray-500 mb-1">Data</label>
-              <input type="date" value={a.date} onChange={(e) => setApps((apps) => apps.map((x, j) => (j === ai ? { ...x, date: e.target.value } : x)))}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Data</label>
+                <input type="date" value={a.date} onChange={(e) => setApps((apps) => apps.map((x, j) => (j === ai ? { ...x, date: e.target.value } : x)))}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Responsável pelo preparo *</label>
+                <input value={a.preparedBy} required placeholder="Quem preparou as células"
+                  onChange={(e) => setApps((apps) => apps.map((x, j) => (j === ai ? { ...x, preparedBy: e.target.value } : x)))}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white" />
+              </div>
             </div>
             {!editable ? (
               <p className="text-sm text-gray-600">{a.summary || "Sem lotes registrados"}</p>
@@ -164,7 +176,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
               return (
                 <div key={c.key} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{c.label}</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{c.label}{c.key === "SORO" ? " * (lote obrigatório)" : ""}</p>
                     {lots.length > 0 && (
                       <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline"
                         onClick={() => setApps((apps) => apps.map((x, j) => (j === ai ? { ...x, items: [...x.items, { category: c.key, batchId: "", quantity: "" }] } : x)))}>

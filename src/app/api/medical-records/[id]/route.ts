@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { canAccessUnit } from "@/lib/patient-search";
-import { canEditRecord, parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
+import { canEditRecord, checkApplications, cleanPreparedBy, parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
 
 export async function GET(
   _request: NextRequest,
@@ -87,6 +87,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let batchInfo: Awaited<ReturnType<typeof validateLots>> | null = null;
   if (isOpen) {
     apps = parseApplications(body.applications);
+    const appError = checkApplications(apps);
+    if (appError) return Response.json({ error: appError }, { status: 400 });
     batchInfo = await validateLots(apps, record.unitId);
     if ("error" in batchInfo) return Response.json({ error: batchInfo.error }, { status: 400 });
   }
@@ -111,6 +113,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             medicalRecordId: id,
             number: a.number,
             date: a.date ? new Date(a.date) : null,
+            preparedBy: a.preparedBy,
             cells: summarize(a.items, "CELULAS", batchInfo.batchInfo, a.cells),
             serum: summarize(a.items, "SORO", batchInfo.batchInfo, a.serum),
             medium: summarize(a.items, "MEIO", batchInfo.batchInfo, a.medium),
@@ -119,10 +122,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
     } else if (Array.isArray(body.applications)) {
-      // Já com baixa: só as datas das aplicações existentes podem mudar (lotes ficam como foram baixados)
-      for (const a of body.applications as { id?: string; date?: string | null }[]) {
+      // Já com baixa: só a data e o responsável pelo preparo podem mudar (lotes ficam como foram baixados)
+      for (const a of body.applications as { id?: string; date?: string | null; preparedBy?: string | null }[]) {
         if (!a.id || !record.applications.some((x) => x.id === a.id)) continue;
-        await tx.application.update({ where: { id: a.id }, data: { date: a.date ? new Date(a.date) : null } });
+        await tx.application.update({ where: { id: a.id }, data: { date: a.date ? new Date(a.date) : null, preparedBy: cleanPreparedBy(a.preparedBy) } });
       }
     }
 

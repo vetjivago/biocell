@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { CLINICAL_ROLES, roleLabel } from "@/lib/roles";
+import { CLINICAL_ROLES, canOpenPage, roleLabel } from "@/lib/roles";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
@@ -25,10 +25,10 @@ const NAV_ITEMS = [
   { href: "/pacientes", label: "Pacientes", icon: Users, roles: CLINICAL_ROLES as string[] },
   { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: CLINICAL_ROLES as string[], serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
-  { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "UNIT_MANAGER"] },
-  { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "UNIT_MANAGER"] },
+  { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] },
+  { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] },
   { href: "/alertas", label: "Alertas", icon: AlertTriangle, roles: null },
-  { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "UNIT_MANAGER"] },
+  { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] },
 ];
 
 export default function Sidebar({ userName, userRole, hasServiceOrders = false }: { userName: string; userRole: string; hasServiceOrders?: boolean }) {
@@ -76,7 +76,7 @@ export default function Sidebar({ userName, userRole, hasServiceOrders = false }
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.filter((item) => (!item.roles || item.roles.includes(userRole)) && (!("serviceOrders" in item) || hasServiceOrders)).map((item) => {
+          {NAV_ITEMS.filter((item) => (!item.roles || item.roles.includes(userRole)) && canOpenPage(userRole, item.href) && (!("serviceOrders" in item) || hasServiceOrders)).map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

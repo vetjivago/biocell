@@ -1,11 +1,13 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
-import { assignableRoles, canManageUsers } from "./roles";
+import { assignableRoles, canManageUsers, seesAllUnits } from "./roles";
 import { normalizePhone } from "./phone";
 
 // Usuários que quem está logado pode ver/gerenciar
 export function manageableUsersWhere(session: SessionUser) {
   if (session.role === "ADMIN") return { deletedAt: null };
+  // Administrativo: todos os acessos, menos os da matriz
+  if (session.role === "ADMINISTRATIVE") return { deletedAt: null, role: { in: assignableRoles(session.role) } };
   // Gestor: equipe das suas unidades, sem acessos de matriz/estoque central
   return {
     deletedAt: null,
@@ -28,7 +30,7 @@ export async function getManageableUser(session: SessionUser, userId: string) {
 export async function validateUnitIds(session: SessionUser, unitIds: unknown) {
   if (!Array.isArray(unitIds) || unitIds.some((u) => typeof u !== "string")) return { error: "Unidades inválidas" } as const;
   const ids = [...new Set(unitIds as string[])];
-  if (session.role !== "ADMIN" && ids.some((u) => !session.unitIds.includes(u))) {
+  if (!seesAllUnits(session.role) && ids.some((u) => !session.unitIds.includes(u))) {
     return { error: "Você só pode atribuir as suas unidades" } as const;
   }
   const found = await prisma.unit.count({ where: { id: { in: ids } } });

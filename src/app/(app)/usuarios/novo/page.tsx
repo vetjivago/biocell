@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -13,7 +14,7 @@ export default async function NovoUsuarioPage({ searchParams }: { searchParams: 
   const { unidade } = await searchParams;
 
   const units = await prisma.unit.findMany({
-    where: { active: true, ...(session.role === "ADMIN" ? {} : { id: { in: session.unitIds } }) },
+    where: { active: true, ...(seesAllUnits(session.role) ? {} : { id: { in: session.unitIds } }) },
     select: { id: true, name: true, city: true, state: true },
     orderBy: { name: "asc" },
   });

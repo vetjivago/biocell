@@ -19,7 +19,7 @@ export async function GET(
   const access = await getAccessibleOrder(session, app.serviceOrderId);
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
   return Response.json({
-    id: app.id, number: app.number, status: app.status, medicalRecordId: app.medicalRecordId,
+    id: app.id, number: app.number, status: app.status, medicalRecordId: app.medicalRecordId, date: app.date,
     veterinarian: app.veterinarian, technicalNotes: app.technicalNotes,
     applicationRoute: app.applicationRoute, cellQuantity: app.cellQuantity, preparation: app.preparation,
     serviceOrder: app.serviceOrder,

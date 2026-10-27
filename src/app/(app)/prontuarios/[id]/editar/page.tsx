@@ -66,6 +66,7 @@ export default async function EditarProntuarioPage({ params }: { params: Promise
             id: a.id,
             number: a.number,
             date: day(a.date),
+            preparedBy: a.preparedBy || "",
             items: a.items.map((it) => ({ batchId: it.batchId, category: it.category as ProductCategory, quantity: String(it.quantity) })),
             summary: [a.cells && `Células: ${a.cells}`, a.serum && `Soro: ${a.serum}`, a.medium && `Meio: ${a.medium}`].filter(Boolean).join(" · "),
           })),

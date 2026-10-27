@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canManageUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { parseUnitInput } from "@/lib/units";
@@ -7,7 +8,7 @@ import { parseUnitInput } from "@/lib/units";
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
-  if (session.role !== "ADMIN") return Response.json({ error: "Sem permissão" }, { status: 403 });
+  if (!canManageUnits(session.role)) return Response.json({ error: "Sem permissão" }, { status: 403 });
 
   const { id } = await params;
   const unit = await prisma.unit.findFirst({ where: { id, organizationId: session.organizationId } });

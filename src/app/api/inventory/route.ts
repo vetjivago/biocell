@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canSupplyStock, seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { NO_LOT, normalizeBatchNumber, standardProduct } from "@/lib/products";
@@ -11,7 +12,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const unitId = searchParams.get("unitId");
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = seesAllUnits(session.role);
+  if (unitId && !isAdmin && !session.unitIds.includes(unitId)) return Response.json([], { status: 403 });
   const unitFilter = unitId
     ? { unitId }
     : isAdmin ? {} : { unitId: { in: session.unitIds } };
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
 
-  if (session.role !== "ADMIN" && session.role !== "STOCK") {
+  if (!canSupplyStock(session.role)) {
     return Response.json({ error: "Sem permissão" }, { status: 403 });
   }
 

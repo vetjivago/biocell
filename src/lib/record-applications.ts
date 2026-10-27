@@ -3,11 +3,11 @@ import { prisma } from "./prisma";
 // Regras das aplicações do prontuário CT (usadas ao criar e ao editar)
 
 type AppItemInput = { batchId?: string; category?: string; quantity?: number | string };
-type AppInput = { id?: string; number: number; date?: string | null; cells?: string; serum?: string; medium?: string; items?: AppItemInput[] };
+type AppInput = { id?: string; number: number; date?: string | null; preparedBy?: string | null; cells?: string; serum?: string; medium?: string; items?: AppItemInput[] };
 type ThawInput = { number: number; thawedStraws?: number | string | null; thawedMeio?: number | string | null; thawedSoro?: number | string | null; retrievalLocation?: string | null };
 
 export type ParsedItem = { batchId: string; category: string; quantity: number };
-export type ParsedApp = { id?: string; number: number; date?: string | null; cells?: string; serum?: string; medium?: string; items: ParsedItem[] };
+export type ParsedApp = { id?: string; number: number; date?: string | null; preparedBy: string | null; cells?: string; serum?: string; medium?: string; items: ParsedItem[] };
 export type BatchInfo = Map<string, { batchNumber: string; category: string; productName: string }>;
 
 export function parseApplications(applications: unknown): ParsedApp[] {
@@ -16,11 +16,25 @@ export function parseApplications(applications: unknown): ParsedApp[] {
     .map((a) => ({
       ...a,
       number: Math.max(1, Math.floor(Number(a.number) || 1)),
+      preparedBy: cleanPreparedBy(a.preparedBy),
       items: (a.items || [])
         .filter((i) => i.batchId && Number(i.quantity) > 0)
         .map((i) => ({ batchId: i.batchId as string, category: i.category || "CELULAS", quantity: Math.floor(Number(i.quantity)) })),
     }))
     .filter((a) => a.date || a.cells || a.items.length > 0);
+}
+
+export function cleanPreparedBy(v: unknown) {
+  return typeof v === "string" ? v.trim().slice(0, 120) || null : null;
+}
+
+// Exigências da BIO CELL em cada aplicação: lote do soro identificado e responsável pelo preparo
+export function checkApplications(apps: ParsedApp[]): string | null {
+  for (const a of apps) {
+    if (!a.items.some((i) => i.category === "SORO")) return `${a.number}ª aplicação: informe o lote do soro`;
+    if (!a.preparedBy) return `${a.number}ª aplicação: informe o responsável pelo preparo`;
+  }
+  return null;
 }
 
 // Lotes precisam estar no estoque da unidade, ser da categoria certa e ter saldo suficiente

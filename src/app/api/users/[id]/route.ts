@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { assignableRoles, isRole } from "@/lib/roles";
+import { assignableRoles, isRole, seesAllUnits } from "@/lib/roles";
 import { getManageableUser, loginTakenError, parseLoginFields, validateUnitIds } from "@/lib/users";
 
 // Edita nome, e-mail/celular de login, função, unidades ou ativa/desativa o acesso
@@ -47,9 +47,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const units = await validateUnitIds(session, body.unitIds);
     if ("error" in units) return Response.json({ error: units.error }, { status: 400 });
     const current = user.units.map((u) => u.unitId);
-    const outside = session.role === "ADMIN" ? [] : current.filter((u) => !session.unitIds.includes(u));
+    const outside = seesAllUnits(session.role) ? [] : current.filter((u) => !session.unitIds.includes(u));
     nextUnitIds = [...new Set([...outside, ...units.ids])];
-    if ((data.role ?? user.role) !== "ADMIN" && nextUnitIds.length === 0) {
+    if (!seesAllUnits(data.role ?? user.role) && nextUnitIds.length === 0) {
       return Response.json({ error: "Escolha ao menos uma unidade" }, { status: 400 });
     }
   }

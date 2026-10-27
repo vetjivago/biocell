@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { canManageUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import UnitForm from "../UnitForm";
 export default async function EditarUnidadePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return null;
-  if (session.role !== "ADMIN") notFound();
+  if (!canManageUnits(session.role)) notFound();
 
   const { id } = await params;
   const unit = await prisma.unit.findFirst({

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { canSupplyStock, seesAllUnits } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe } from "lucide-react";
@@ -14,7 +15,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   if (!session) return null;
   const { unidade } = await searchParams;
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = seesAllUnits(session.role);
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
 
   const grouped = await prisma.inventoryTransaction.groupBy({
@@ -116,7 +117,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
             {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
           </p>
         </div>
-        {isAdmin && <Suspense><SupplyForm /></Suspense>}
+        {canSupplyStock(session.role) && <Suspense><SupplyForm /></Suspense>}
       </div>
 
       {/* Resumo: palhetas por espécie + insumos */}
