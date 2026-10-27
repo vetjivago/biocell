@@ -86,6 +86,20 @@ Dados necessários para o cadastro:
 
 ---
 
+## 4.1 Orçamentos e vendas
+
+Disponível nas unidades com o prontuário geral habilitado. Na ficha do paciente, use a aba **Orçamentos e vendas** (ou o botão **Orçamento** em "Adicionar").
+
+1. Clique em **Novo orçamento**
+2. Em **Adicionar item**, escolha a quantidade e digite o produto ou serviço. Aparecem os itens já usados em outros orçamentos, com o último valor; clique na linha para adicionar. Se não existir, adicione como novo item e informe o valor
+3. Ajuste validade, desconto e observações e clique em **Salvar orçamento**
+4. Quando o tutor aprovar, abra o orçamento e clique em **Converter em venda**: informe a forma de pagamento (e parcelas, no cartão de crédito ou boleto), a data e as observações do pagamento
+5. A venda vira o **Comunicado de venda ao financeiro**: valor, forma de pagamento e a que se refere. Use **Imprimir / PDF p/ financeiro**, **Enviar ao financeiro** (abre o e-mail já preenchido) ou **Copiar texto** (para colar no WhatsApp)
+
+Orçamentos e vendas também aparecem na linha do tempo do Histórico. Quem criou, o gestor da unidade ou a matriz podem cancelar, desfazer a venda (volta a ser orçamento) ou apagar um orçamento.
+
+---
+
 ## 5. Estoque
 
 No menu lateral, clique em **Estoque**.

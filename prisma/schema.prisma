@@ -45,6 +45,7 @@ model Unit {
   shipmentsReceived    Shipment[]       @relation("ShipmentTo")
   clinicalEntries      ClinicalEntry[]
   serviceOrders        ServiceOrder[]
+  sales                Sale[]
 
   @@index([organizationId])
 }
@@ -74,6 +75,8 @@ model User {
   auditLogs      AuditLog[]
   clinicalEntries ClinicalEntry[]
   serviceOrders   ServiceOrder[]
+  salesCreated    Sale[]          @relation("SaleCreatedBy")
+  salesSold       Sale[]          @relation("SaleSoldBy")
 
   @@index([organizationId])
 }
@@ -118,6 +121,7 @@ model Patient {
   medicalRecords  MedicalRecord[]
   clinicalEntries ClinicalEntry[]
   serviceOrders   ServiceOrder[]
+  sales           Sale[]
 
   @@index([unitId])
 }
@@ -495,4 +499,52 @@ model MedicalRecordAttachment {
   createdAt       DateTime      @default(now())
 
   @@index([medicalRecordId])
+}
+
+// ── Orçamentos e Vendas ─────────────────────────────────────────
+// Orçamento do paciente; aprovado, vira venda (mesmo registro) com a forma de pagamento
+// e gera o documento para o financeiro. Valores em centavos
+model Sale {
+  id            String    @id @default(cuid())
+  number        Int       @unique @default(autoincrement())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  unitId        String
+  unit          Unit      @relation(fields: [unitId], references: [id])
+  createdById   String
+  createdBy     User      @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  // QUOTE (orçamento), SALE (venda) ou CANCELLED
+  status        String    @default("QUOTE")
+  validUntil    DateTime?
+  notes         String?
+  discount      Int       @default(0)
+  // Preenchidos na conversão em venda
+  soldAt        DateTime?
+  soldById      String?
+  soldBy        User?     @relation("SaleSoldBy", fields: [soldById], references: [id])
+  paymentMethod String?
+  installments  Int?
+  paymentNotes  String?
+  cancelledAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items SaleItem[]
+
+  @@index([patientId])
+  @@index([unitId])
+  @@index([status])
+}
+
+model SaleItem {
+  id          String @id @default(cuid())
+  saleId      String
+  sale        Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  position    Int
+  description String
+  quantity    Int
+  unitPrice   Int
+
+  @@index([saleId])
+  @@index([description])
 }
