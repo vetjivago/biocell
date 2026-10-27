@@ -270,7 +270,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                   <td className={`px-4 py-3 text-sm font-medium ${tl.cls}`}>{tl.label}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{t.unit.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {t.batch.product.name} <span className="text-gray-400 font-mono">{t.batch.batchNumber}</span>
+                    {t.batch.product.name} {t.batch.batchNumber !== NO_LOT && <span className="text-gray-400 font-mono">{t.batch.batchNumber}</span>}
                   </td>
                   <td className={`px-4 py-3 text-sm font-bold text-right ${t.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
                     {t.quantity > 0 ? `+${t.quantity}` : t.quantity}

@@ -35,7 +35,7 @@ export default async function ProntuarioDetailPage({
       thawings: { orderBy: { number: "asc" } },
       attachments: { select: { id: true, fileName: true, mimeType: true }, orderBy: { createdAt: "asc" } },
       procedures: { orderBy: { date: "desc" } },
-      serviceOrderApplication: { select: { number: true, serviceOrder: { select: { id: true, serialNumber: true } } } },
+      serviceOrderApplication: { select: { number: true, veterinarian: true, serviceOrder: { select: { id: true, serialNumber: true } } } },
       inventoryTransactions: {
         include: { batch: { include: { product: { select: { name: true } } } } },
       },
@@ -102,7 +102,7 @@ export default async function ProntuarioDetailPage({
           <div><p className="text-gray-500">Espécie/Raça</p><p className="font-medium">{record.patient.species}{record.patient.breed ? ` – ${record.patient.breed}` : ""}</p></div>
           <div><p className="text-gray-500">Peso</p><p className="font-medium">{record.patient.weight ? `${record.patient.weight} kg` : "–"}</p></div>
           <div><p className="text-gray-500">Responsável</p><p className="font-medium">{record.patient.ownerName}</p></div>
-          <div><p className="text-gray-500">Veterinário afiliado</p><p className="font-medium">{record.patient.veterinarian || "–"}</p></div>
+          <div><p className="text-gray-500">Veterinário afiliado</p><p className="font-medium">{record.serviceOrderApplication?.veterinarian || record.patient.veterinarian || "–"}</p></div>
           <div><p className="text-gray-500">Clínica</p><p className="font-medium">{record.patient.clinic || "–"}</p></div>
           <div><p className="text-gray-500">Soro Coletado</p><p className="font-medium">{record.serumCollected ? "Sim" : "Não"}</p></div>
           <div><p className="text-gray-500">Data</p><p className="font-medium">{new Date(record.requestDate).toLocaleDateString("pt-BR")}</p></div>
@@ -186,7 +186,7 @@ export default async function ProntuarioDetailPage({
                 <div>
                   <span className="font-medium text-red-600">{t.quantity} un.</span>
                   <span className="text-gray-500 ml-2">{t.batch.product.name}</span>
-                  <span className="text-gray-400 ml-2">Lote: {t.batch.batchNumber}</span>
+                  {t.batch.batchNumber !== NO_LOT && <span className="text-gray-400 ml-2">Lote: {t.batch.batchNumber}</span>}
                 </div>
                 <span className="text-gray-500">Saldo: {t.balance}</span>
               </div>

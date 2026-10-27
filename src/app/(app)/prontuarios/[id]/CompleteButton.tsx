@@ -73,7 +73,10 @@ export default function CompleteButton({
               const rows = plannedItems
                 .filter((p) => p.category === cat)
                 .map((p) => ({ batchId: p.batchId, quantity: p.quantity.toString() }));
-              return rows.length > 0 || cat === "MATERIAL" ? rows : [{ batchId: "", quantity: "" }];
+              if (rows.length > 0 || cat === "MATERIAL") return rows;
+              // Categoria fora do plano: com um único lote ele já fica escolhido (como aparece na tela)
+              const lots = data.filter((s) => s.category === cat);
+              return [{ batchId: lots.length === 1 ? lots[0].batchId : "", quantity: "" }];
             };
             setItems({ CELULAS: fromPlan("CELULAS"), MEIO: fromPlan("MEIO"), SORO: fromPlan("SORO"), MATERIAL: fromPlan("MATERIAL") });
             return;
