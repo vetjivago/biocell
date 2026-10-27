@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Stethoscope, ClipboardList, FlaskConical, Scale, Pill, Syringe, MessageSquare, FileText, Paperclip, Dna,
-  Activity, Camera, Video, BedDouble, Pencil, Phone, Mail, MapPin, CalendarClock,
+  Activity, Camera, Video, BedDouble, Pencil, Phone, Mail, MapPin, CalendarClock, Receipt,
 } from "lucide-react";
 import { ENTRY_TYPES, isEntryType, type EntryType } from "@/lib/clinical-types";
 import { ORDER_STATUS, orderStatus } from "@/lib/service-order-types";
+import { SALE_COLOR, SALE_STATUS, formatBRL, paymentLabel, saleNumber, saleTotals } from "@/lib/sales-types";
 import { formatAge } from "@/lib/patient-fields";
 import { htmlToText } from "@/lib/rich-text";
 import PrintButton from "./geral/PrintButton";
@@ -38,8 +39,8 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 const CT_COLOR = "#00af6b";
 const OS_COLOR = "#ca8a04";
 const TZ = "America/Sao_Paulo";
-// Filtro de tipos: registros do prontuário geral + células-tronco (prontuário CT e OS)
-const FILTER_KEYS = [...(Object.keys(ENTRY_TYPES) as EntryType[]), "CT"] as const;
+// Filtro de tipos: registros do prontuário geral + células-tronco (prontuário CT e OS) + orçamentos/vendas
+const FILTER_KEYS = [...(Object.keys(ENTRY_TYPES) as EntryType[]), "CT", "FIN"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 export default async function PacienteDetailPage({
@@ -74,7 +75,7 @@ export default async function PacienteDetailPage({
   if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) notFound();
 
   const generalEnabled = patient.unit.generalRecordEnabled;
-  const tab = generalEnabled && aba !== "ct" ? "geral" : "ct";
+  const tab = !generalEnabled || aba === "ct" ? "ct" : aba === "financeiro" ? "financeiro" : "geral";
 
   // Tipos selecionados (vazio = todos; "nenhum" = nenhum)
   const selected = new Set<FilterKey>(
@@ -94,6 +95,15 @@ export default async function PacienteDetailPage({
     : [];
   const entries = allEntries.filter((e) => selected.has(e.type as FilterKey) && inPeriod(e.occurredAt));
 
+  // Orçamentos e vendas (usam o mesmo "habilitado" do prontuário geral)
+  const sales = generalEnabled
+    ? await prisma.sale.findMany({
+        where: { patientId: id },
+        orderBy: { createdAt: "desc" },
+        include: { items: { select: { description: true, quantity: true, unitPrice: true }, orderBy: { position: "asc" } } },
+      })
+    : [];
+
   // Cabeçalho: patologias, peso mais recente e próximo retorno
   const pathologies = [...new Set([
     ...allEntries.filter((e) => e.type === "PATOLOGIA" && e.title).map((e) => e.title!),
@@ -110,7 +120,8 @@ export default async function PacienteDetailPage({
   type TimelineItem =
     | { kind: "entry"; date: Date; entry: (typeof entries)[number] }
     | { kind: "ct"; date: Date; record: (typeof patient.medicalRecords)[number] }
-    | { kind: "os"; date: Date; order: (typeof patient.serviceOrders)[number] };
+    | { kind: "os"; date: Date; order: (typeof patient.serviceOrders)[number] }
+    | { kind: "sale"; date: Date; sale: (typeof sales)[number] };
   const timeline: TimelineItem[] = [
     ...entries.map((entry) => ({ kind: "entry" as const, date: entry.occurredAt, entry })),
     ...(selected.has("CT")
@@ -119,6 +130,7 @@ export default async function PacienteDetailPage({
           ...patient.serviceOrders.filter((o) => inPeriod(o.createdAt)).map((order) => ({ kind: "os" as const, date: order.createdAt, order })),
         ]
       : []),
+    ...(selected.has("FIN") ? sales.filter((s) => inPeriod(s.createdAt)).map((sale) => ({ kind: "sale" as const, date: sale.createdAt, sale })) : []),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const byYear = new Map<number, TimelineItem[]>();
@@ -148,8 +160,8 @@ export default async function PacienteDetailPage({
     else next.add(k);
     return qs(next);
   };
-  const filterLabel = (k: FilterKey) => (k === "CT" ? "Células-tronco" : ENTRY_TYPES[k].label);
-  const filterColor = (k: FilterKey) => (k === "CT" ? CT_COLOR : ENTRY_TYPES[k].color);
+  const filterLabel = (k: FilterKey) => (k === "CT" ? "Células-tronco" : k === "FIN" ? "Orçamentos/vendas" : ENTRY_TYPES[k].label);
+  const filterColor = (k: FilterKey) => (k === "CT" ? CT_COLOR : k === "FIN" ? SALE_COLOR : ENTRY_TYPES[k].color);
 
   return (
     <div className="max-w-6xl">
@@ -227,10 +239,11 @@ export default async function PacienteDetailPage({
           {[
             { key: "geral", label: "Histórico" },
             { key: "ct", label: `Células-tronco (${patient.medicalRecords.length})` },
+            { key: "financeiro", label: `Orçamentos e vendas (${sales.length})` },
           ].map((t) => (
             <Link
               key={t.key}
-              href={`${base}${t.key === "ct" ? "?aba=ct" : ""}`}
+              href={`${base}${t.key === "geral" ? "" : `?aba=${t.key}`}`}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px ${tab === t.key ? "border-primary text-primary" : "border-transparent text-gray-500 hover:text-gray-700"}`}
             >
               {t.label}
@@ -260,6 +273,11 @@ export default async function PacienteDetailPage({
                 );
               })}
             </div>
+            <Link href={`${base}/orcamentos/novo`}
+              className="mt-2 flex items-center justify-center gap-2 rounded-lg py-3 text-white text-sm font-medium hover:opacity-90"
+              style={{ backgroundColor: SALE_COLOR }}>
+              <Receipt size={18} /> Orçamento
+            </Link>
             {patient.unit.serviceOrderEnabled && (
               <Link href={`/ordens-servico/nova?patientId=${patient.id}`}
                 className="mt-2 flex items-center justify-center gap-2 rounded-lg py-3 text-white text-sm font-medium hover:opacity-90"
@@ -322,6 +340,26 @@ export default async function PacienteDetailPage({
                 <p className="text-lg text-gray-700 mb-2">{year}</p>
                 <div className="space-y-2">
                   {items.map((item) => {
+                    if (item.kind === "sale") {
+                      const s = item.sale;
+                      const st = SALE_STATUS[s.status] || SALE_STATUS.QUOTE;
+                      return (
+                        <Link key={`sale-${s.id}`} href={`${base}/orcamentos/${s.id}`}
+                          className="block bg-white rounded-lg border border-gray-100 border-l-4 px-4 py-3 hover:bg-gray-50 break-inside-avoid"
+                          style={{ borderLeftColor: SALE_COLOR }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500">{fmtDateTime(s.createdAt)}</p>
+                              <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                                <Receipt size={14} /> {s.soldAt ? "Venda" : "Orçamento"} Nº {saleNumber(s.number)} · {formatBRL(saleTotals(s).total)}
+                              </p>
+                              <p className="text-sm text-gray-600 truncate">{s.items.map((i) => i.description).join(", ")}</p>
+                            </div>
+                            <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
+                          </div>
+                        </Link>
+                      );
+                    }
                     if (item.kind === "os") {
                       const o = item.order;
                       const os = ORDER_STATUS[orderStatus(o)];
@@ -394,6 +432,42 @@ export default async function PacienteDetailPage({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      ) : tab === "financeiro" ? (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-gray-900">Orçamentos e vendas ({sales.length})</h2>
+            <Link href={`${base}/orcamentos/novo`}
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary-light text-white rounded-lg text-sm font-medium">
+              <Plus size={14} /> Novo orçamento
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {sales.map((s) => {
+              const st = SALE_STATUS[s.status] || SALE_STATUS.QUOTE;
+              return (
+                <Link key={s.id} href={`${base}/orcamentos/${s.id}`}
+                  className="flex items-center justify-between gap-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900">
+                      {s.soldAt ? "Venda" : "Orçamento"} Nº {saleNumber(s.number)} · {formatBRL(saleTotals(s).total)}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {s.createdAt.toLocaleDateString("pt-BR", { timeZone: TZ })}
+                      {s.soldAt ? ` · vendido em ${fmtDay(s.soldAt)} · ${paymentLabel(s.paymentMethod, s.installments)}` : s.validUntil ? ` · válido até ${fmtDay(s.validUntil)}` : ""}
+                    </p>
+                    <p className="text-sm text-gray-600 truncate">{s.items.map((i) => `${i.quantity} x ${i.description}`).join(", ")}</p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
+                </Link>
+              );
+            })}
+            {sales.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
+                Nenhum orçamento ainda. Clique em “Novo orçamento” para adicionar.
+              </div>
+            )}
           </div>
         </div>
       ) : (
