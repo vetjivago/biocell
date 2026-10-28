@@ -94,7 +94,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   const counts = await prisma.user.findUnique({
     where: { id },
-    select: { _count: { select: { medicalRecords: true, clinicalEntries: true, serviceOrders: true, auditLogs: true } } },
+    select: { _count: { select: { medicalRecords: true, clinicalEntries: true, serviceOrders: true, salesCreated: true, salesSold: true, auditLogs: true } } },
   });
   const hasHistory = Object.values(counts?._count ?? {}).some((n) => n > 0);
   const details = JSON.stringify({ name: user.name, email: user.email, phone: user.phone, role: user.role, unitIds: user.units.map((u) => u.unitId), hardDelete: !hasHistory });
