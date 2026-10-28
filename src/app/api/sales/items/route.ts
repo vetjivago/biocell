@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { hasRole } from "@/lib/roles";
 
 // Sem acento e minúsculo: "celula" encontra "Célula-tronco"
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("pt-BR");
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   const q = fold((request.nextUrl.searchParams.get("q") || "").trim().slice(0, 100));
   const recent = await prisma.saleItem.findMany({
-    where: { sale: session.role === "ADMIN" ? {} : { unitId: { in: session.unitIds } } },
+    where: { sale: hasRole(session.role, "ADMIN") ? {} : { unitId: { in: session.unitIds } } },
     orderBy: { sale: { createdAt: "desc" } },
     select: { description: true, unitPrice: true },
     take: 2000,

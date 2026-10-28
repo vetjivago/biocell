@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
 import { MAX_INSTALLMENTS, PAYMENT_METHODS, parseMoney, type SaleItemInput } from "./sales-types";
+import { hasRole } from "./roles";
 
 export * from "./sales-types";
 
@@ -11,7 +12,7 @@ export async function getAccessibleSale(session: SessionUser, saleId: string) {
     include: { unit: { select: { generalRecordEnabled: true } }, items: { orderBy: { position: "asc" } } },
   });
   if (!sale) return { error: "Orçamento não encontrado", status: 404 } as const;
-  if (session.role !== "ADMIN" && !session.unitIds.includes(sale.unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(sale.unitId)) {
     return { error: "Sem permissão", status: 403 } as const;
   }
   if (!sale.unit.generalRecordEnabled) return { error: "Orçamentos não habilitados para esta unidade", status: 403 } as const;
@@ -20,7 +21,7 @@ export async function getAccessibleSale(session: SessionUser, saleId: string) {
 
 // Quem criou, o gestor da unidade ou a matriz podem cancelar, desfazer a venda ou apagar
 export function canManageSale(session: SessionUser, sale: { createdById: string }) {
-  return sale.createdById === session.id || session.role === "ADMIN" || session.role === "UNIT_MANAGER";
+  return sale.createdById === session.id || hasRole(session.role, "ADMIN", "UNIT_MANAGER");
 }
 
 function text(v: unknown, max: number) {
