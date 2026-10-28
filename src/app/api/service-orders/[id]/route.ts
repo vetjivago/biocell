@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { CHECKLIST_TERMS, canDeleteOrder, getAccessibleOrder, optText, parseChecklist } from "@/lib/service-orders";
+import { CHECKLIST_TERMS, canDeleteOrder, getAccessibleOrder, optText, parseChecklist, resolveOrderAlerts } from "@/lib/service-orders";
 import { hasRole } from "@/lib/roles";
 
 // Edita dados gerais da OS, o checklist ("solicitado") ou cancela
@@ -37,6 +37,8 @@ export async function PATCH(
 
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.serviceOrder.update({ where: { id }, data });
+    // OS cancelada não espera mais o laboratório
+    if (data.cancelled === true) await resolveOrderAlerts(tx, id);
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "UPDATE", entity: "ServiceOrder", entityId: id,
@@ -74,6 +76,8 @@ export async function DELETE(
 
   await prisma.$transaction(async (tx) => {
     await tx.serviceOrder.delete({ where: { id } });
+    // O alerta "OS aberta" apontaria para uma OS que não existe mais
+    await tx.alert.deleteMany({ where: { serviceOrderId: id } });
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "DELETE", entity: "ServiceOrder", entityId: id,
