@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import type { Prisma } from "@prisma/client";
 import type { SessionUser } from "./auth";
 import { hasRole } from "./roles";
 
@@ -41,4 +42,18 @@ export function optDate(v: unknown): Date | null | "invalid" {
 // Quem pode apagar uma OS ainda sem prontuário: quem abriu, o gestor da unidade ou a matriz
 export function canDeleteOrder(session: SessionUser, order: { createdById: string }) {
   return order.createdById === session.id || hasRole(session.role, "ADMIN", "UNIT_MANAGER");
+}
+
+// Veterinário clínico conclui o pedido da OS e avisa o laboratório; quem prepara preenche o prontuário
+export function canSendToLab(role: string) {
+  return hasRole(role, "ADMIN", "UNIT_MANAGER", "PROFESSIONAL");
+}
+
+export function canFillOrderRecord(role: string) {
+  return hasRole(role, "ADMIN", "UNIT_MANAGER", "LAB");
+}
+
+// Laboratório começou o preparo ou preencheu o prontuário: o alerta "OS aberta" sai da lista
+export async function resolveOrderAlerts(tx: Prisma.TransactionClient, serviceOrderId: string) {
+  await tx.alert.updateMany({ where: { serviceOrderId, type: "SERVICE_ORDER", resolved: false }, data: { resolved: true } });
 }

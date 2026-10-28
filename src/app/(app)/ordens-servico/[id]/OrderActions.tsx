@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Paperclip, Pencil, FlaskConical, FilePlus, Trash2 } from "lucide-react";
+import { Paperclip, Pencil, FlaskConical, FilePlus, Trash2, Send, CheckCircle } from "lucide-react";
 import { CHECKLIST_TERMS, ROUTE_OPTIONS, type ChecklistKey } from "@/lib/service-order-types";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/clinical-types";
 
@@ -17,17 +17,19 @@ async function send(url: string, method: string, body: unknown) {
   return data;
 }
 
-// Ações de uma aplicação: iniciar preparo, preencher prontuário, editar dados
+// Ações de uma aplicação: concluir OS (clínico avisa o laboratório), iniciar preparo, preencher prontuário, editar dados
 export function ApplicationActions({
-  app, patientId, isFirst, header,
+  app, patientId, isFirst, header, canSend, canFill,
 }: {
   app: {
     id: string; number: number; status: string; date: string; veterinarian: string; financial: string; technicalNotes: string;
-    applicationRoute: string; cellQuantity: string; preparation: string; medicalRecordId: string | null;
+    applicationRoute: string; cellQuantity: string; preparation: string; medicalRecordId: string | null; sentToLab: string | null;
   };
   patientId: string;
   isFirst: boolean;
   header?: { orderId: string; clinic: string; city: string; disease: string; diagnosisTime: string };
+  canSend: boolean;
+  canFill: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -94,14 +96,27 @@ export function ApplicationActions({
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 print:hidden">
-      {app.status === "OPEN" && (
+      {canSend && app.status === "OPEN" && !app.sentToLab && (
+        <button type="button" disabled={busy}
+          onClick={() => {
+            if (!confirm("Concluir a OS e avisar o laboratório? Confira os dados e as orientações de preparo antes.")) return;
+            run(() => send(`/api/service-order-applications/${app.id}`, "PATCH", { sendToLab: true }));
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary-light text-white rounded-lg text-sm font-medium disabled:opacity-50">
+          <Send size={14} /> {busy ? "Enviando..." : "Concluir OS"}
+        </button>
+      )}
+      {app.sentToLab && app.status === "OPEN" && (
+        <span className="flex items-center gap-1.5 text-sm text-green-700"><CheckCircle size={14} /> Concluída e enviada ao laboratório em {app.sentToLab}</span>
+      )}
+      {canFill && app.status === "OPEN" && (
         <button type="button" disabled={busy}
           onClick={() => run(() => send(`/api/service-order-applications/${app.id}`, "PATCH", { status: "IN_PREP" }))}
           className="flex items-center gap-1.5 px-3 py-2 border border-yellow-300 bg-yellow-50 text-yellow-800 rounded-lg text-sm font-medium">
           <FlaskConical size={14} /> Iniciar preparo
         </button>
       )}
-      {app.status !== "DONE" && (
+      {canFill && app.status !== "DONE" && (
         <Link href={`/prontuarios/novo?patientId=${patientId}&osApp=${app.id}`}
           className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary-light text-white rounded-lg text-sm font-medium">
           <FilePlus size={14} /> Preencher prontuário

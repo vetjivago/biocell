@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { syncOpenLowStockAlerts } from "@/lib/stock-alerts";
+import { canFillOrderRecord } from "@/lib/service-orders";
 
 export default async function AlertasPage() {
   const session = await getSession();
@@ -14,8 +15,9 @@ export default async function AlertasPage() {
   const unitFilter = allUnits ? {} : { unitId: { in: session.unitIds } };
   await syncOpenLowStockAlerts(allUnits ? undefined : session.unitIds);
 
+  // "OS aberta" é para quem prepara as células (laboratório, gestor, matriz)
   const alerts = await prisma.alert.findMany({
-    where: unitFilter,
+    where: { ...unitFilter, ...(canFillOrderRecord(session.role) ? {} : { type: { not: "SERVICE_ORDER" } }) },
     include: { unit: { select: { name: true } } },
     orderBy: [{ resolved: "asc" }, { createdAt: "desc" }],
     take: 50,
@@ -40,13 +42,18 @@ export default async function AlertasPage() {
                   <span className={`text-xs px-2 py-1 rounded-full ${
                     a.resolved ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
                   }`}>
-                    {a.resolved ? "Resolvido" : a.type === "LOW_STOCK" ? "Estoque Baixo" : a.type}
+                    {a.resolved ? "Resolvido" : a.type === "LOW_STOCK" ? "Estoque Baixo" : a.type === "SERVICE_ORDER" ? "OS aberta" : a.type}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">{a.message}</p>
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-gray-400">{new Date(a.createdAt).toLocaleString("pt-BR")}</p>
-                  {!a.resolved && isAdmin && (
+                  {!a.resolved && a.serviceOrderId && (
+                    <span className="text-xs text-primary font-medium flex items-center gap-1">
+                      Abrir OS <ChevronRight size={14} />
+                    </span>
+                  )}
+                  {!a.resolved && isAdmin && a.type === "LOW_STOCK" && (
                     <span className="text-xs text-primary font-medium flex items-center gap-1">
                       Abastecer <ChevronRight size={14} />
                     </span>
@@ -56,7 +63,15 @@ export default async function AlertasPage() {
             </div>
           );
 
-          if (!a.resolved && isAdmin) {
+          if (!a.resolved && a.serviceOrderId) {
+            return (
+              <Link key={a.id} href={`/ordens-servico/${a.serviceOrderId}`} className="block bg-white rounded-xl p-4 shadow-sm border border-blue-200 hover:bg-blue-50 transition-colors">
+                {content}
+              </Link>
+            );
+          }
+
+          if (!a.resolved && isAdmin && a.type === "LOW_STOCK") {
             return (
               <Link key={a.id} href={`/estoque?unitId=${a.unitId}&supply=true`} className="block bg-white rounded-xl p-4 shadow-sm border border-amber-200 hover:bg-amber-50 transition-colors">
                 {content}

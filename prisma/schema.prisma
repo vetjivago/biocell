@@ -351,6 +351,8 @@ model Alert {
   unit      Unit     @relation(fields: [unitId], references: [id])
   type      String
   message   String
+  // Alerta "OS aberta" (type SERVICE_ORDER): leva à OS
+  serviceOrderId String?
   resolved  Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -463,6 +465,8 @@ model ServiceOrderApplication {
   cellQuantity     String?
   preparation      String?
   status          String         @default("OPEN")
+  // Veterinário clínico concluiu o pedido e avisou o laboratório (alerta "OS aberta")
+  sentToLabAt     DateTime?
   medicalRecordId String?        @unique
   medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
   createdAt       DateTime       @default(now())

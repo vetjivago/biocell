@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { APP_STATUS, ORDER_STATUS, canDeleteOrder, getAccessibleOrder, orderStatus, parseChecklist } from "@/lib/service-orders";
+import { APP_STATUS, ORDER_STATUS, canDeleteOrder, canFillOrderRecord, canSendToLab, getAccessibleOrder, orderStatus, parseChecklist } from "@/lib/service-orders";
 import PrintButton from "../../pacientes/[id]/geral/PrintButton";
 import { AddApplication, ApplicationActions, Checklist, DeleteOrderButton } from "./OrderActions";
 
@@ -133,11 +133,14 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
               {!order.cancelled && (
                 <ApplicationActions
                   patientId={p.id}
+                  canSend={canSendToLab(session.role)}
+                  canFill={canFillOrderRecord(session.role)}
                   isFirst={i === 0}
                   app={{
                     id: a.id, number: a.number, status: a.status, date: dayInput(a.date), veterinarian: a.veterinarian || "",
                     financial: a.financial || "", technicalNotes: a.technicalNotes || "", medicalRecordId: a.medicalRecordId,
                     applicationRoute: a.applicationRoute || "", cellQuantity: a.cellQuantity || "", preparation: a.preparation || "",
+                    sentToLab: a.sentToLabAt ? a.sentToLabAt.toLocaleString("pt-BR", { ...tz, dateStyle: "short", timeStyle: "short" }) : null,
                   }}
                   header={i === 0 ? { orderId: order.id, clinic: order.clinic || "", city: order.city || "", disease: order.disease || "", diagnosisTime: order.diagnosisTime || "" } : undefined}
                 />

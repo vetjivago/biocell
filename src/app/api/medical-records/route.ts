@@ -5,6 +5,7 @@ import { checkApplications, parseApplications, parseThawings, summarize, validat
 import { nextRecordSerial } from "@/lib/record-serial";
 import { Prisma } from "@prisma/client";
 import { hasRole } from "@/lib/roles";
+import { resolveOrderAlerts } from "@/lib/service-orders";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Prontuário preenchido a partir de uma aplicação da Ordem de Serviço
-  let serviceOrderApp: { id: string } | null = null;
+  let serviceOrderApp: { id: string; serviceOrderId: string } | null = null;
   if (serviceOrderApplicationId) {
     const soa = await prisma.serviceOrderApplication.findUnique({
       where: { id: String(serviceOrderApplicationId) },
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
     if (soa.serviceOrder.cancelled) return Response.json({ error: "Ordem de serviço cancelada" }, { status: 400 });
     if (soa.medicalRecordId) return Response.json({ error: "Esta aplicação da OS já tem prontuário preenchido" }, { status: 409 });
-    serviceOrderApp = { id: soa.id };
+    serviceOrderApp = { id: soa.id, serviceOrderId: soa.serviceOrderId };
   }
 
   const validApps = parseApplications(applications);
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
             data: { medicalRecordId: mr.id, status: "DONE" },
           });
           if (linked.count === 0) throw new Error("OS_ALREADY_LINKED");
+          await resolveOrderAlerts(tx, serviceOrderApp.serviceOrderId);
         }
 
         return mr;

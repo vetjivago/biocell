@@ -34,7 +34,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     }),
     prisma.unit.findMany({ where: { id: { in: unitIds } }, select: { id: true, name: true, city: true, state: true } }),
     prisma.stockThreshold.findMany({ where: { unitId: { in: unitIds } }, select: { unitId: true, minimumStraws: true } }),
-    prisma.alert.count({ where: { ...unitFilter, resolved: false } }),
+    prisma.alert.count({ where: { ...unitFilter, resolved: false, type: "LOW_STOCK" } }),
     prisma.inventoryTransaction.findMany({
       where: unitFilter,
       include: {

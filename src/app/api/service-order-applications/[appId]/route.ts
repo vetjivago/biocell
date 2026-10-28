@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { getAccessibleOrder, optDate, optText } from "@/lib/service-orders";
+import { canSendToLab, getAccessibleOrder, optDate, optText, resolveOrderAlerts } from "@/lib/service-orders";
 
 // Contexto da aplicação para o formulário de prontuário
 export async function GET(
@@ -26,7 +26,8 @@ export async function GET(
   });
 }
 
-// Edita os dados da aplicação ou marca "em preparo". "Concluída" só via prontuário vinculado.
+// Edita os dados da aplicação, marca "em preparo" ou conclui a OS (avisa o laboratório).
+// "Concluída" só via prontuário vinculado.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ appId: string }> }
@@ -59,8 +60,31 @@ export async function PATCH(
     data.status = body.status;
   }
 
+  // Concluir OS: o veterinário terminou o pedido e o laboratório recebe o alerta "OS aberta"
+  const sendToLab = body.sendToLab === true;
+  if (sendToLab) {
+    if (!canSendToLab(session.role)) return Response.json({ error: "Sem permissão" }, { status: 403 });
+    if (access.order.cancelled) return Response.json({ error: "OS cancelada" }, { status: 400 });
+    if (app.status !== "OPEN") return Response.json({ error: "O laboratório já está com esta aplicação" }, { status: 400 });
+    if (app.sentToLabAt) return Response.json({ error: "Esta OS já foi concluída e enviada ao laboratório" }, { status: 400 });
+    data.sentToLabAt = new Date();
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.serviceOrderApplication.update({ where: { id: appId }, data });
+    if (sendToLab) {
+      const order = await tx.serviceOrder.findUniqueOrThrow({
+        where: { id: app.serviceOrderId },
+        select: { serialNumber: true, unitId: true, patient: { select: { name: true, species: true } } },
+      });
+      await tx.alert.create({
+        data: {
+          unitId: order.unitId, type: "SERVICE_ORDER", serviceOrderId: app.serviceOrderId,
+          message: `OS ${order.serialNumber} aberta: ${app.number}ª aplicação de ${order.patient.name} (${order.patient.species}), enviada por ${session.name}. Aguardando preparo.`,
+        },
+      });
+    }
+    if (data.status === "IN_PREP") await resolveOrderAlerts(tx, app.serviceOrderId);
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "UPDATE", entity: "ServiceOrderApplication", entityId: appId,
