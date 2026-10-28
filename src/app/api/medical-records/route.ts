@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { checkApplications, parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
 import { nextRecordSerial } from "@/lib/record-serial";
 import { Prisma } from "@prisma/client";
+import { hasRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const unitId = searchParams.get("unitId");
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = hasRole(session.role, "ADMIN");
   if (unitId && !isAdmin && !session.unitIds.includes(unitId)) return Response.json([], { status: 403 });
   const where = {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   }
   const unitId = existingPatient.unitId;
 
-  if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(unitId)) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 

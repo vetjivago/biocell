@@ -8,6 +8,7 @@ import { canEditRecord } from "@/lib/record-applications";
 import DeleteRecordButton from "./DeleteRecordButton";
 import CompleteButton from "./CompleteButton";
 import RecordPhotos from "./RecordPhotos";
+import { hasRole } from "@/lib/roles";
 
 export default async function ProntuarioDetailPage({
   params,
@@ -43,7 +44,7 @@ export default async function ProntuarioDetailPage({
   });
 
   if (!record) notFound();
-  if (session.role !== "ADMIN" && !session.unitIds.includes(record.unitId)) notFound();
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(record.unitId)) notFound();
   const canEdit = canEditRecord(session, record);
   const deletable = record.status !== "COMPLETED" && record.inventoryTransactions.length === 0;
 

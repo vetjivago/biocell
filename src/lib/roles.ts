@@ -16,38 +16,63 @@ export function isRole(v: unknown): v is Role {
   return typeof v === "string" && v in ROLES;
 }
 
+// Uma pessoa pode ter várias funções: ficam na mesma coluna, separadas por vírgula
+// (ex.: "UNIT_MANAGER,PROFESSIONAL"), e as permissões se somam.
+// O antigo "PROFESSIONAL_LAB" vale como clínico + laboratório.
+export function parseRoles(role: string | null | undefined): Role[] {
+  const list = (role ?? "").split(",").map((r) => r.trim()).flatMap((r): Role[] => (r === "PROFESSIONAL_LAB" ? ["PROFESSIONAL", "LAB"] : isRole(r) ? [r] : []));
+  return (Object.keys(ROLES) as Role[]).filter((r) => list.includes(r));
+}
+
+export function normalizeRoles(roles: Role[]) {
+  return parseRoles(roles.join(","));
+}
+
+export function serializeRoles(roles: Role[]) {
+  return normalizeRoles(roles).join(",");
+}
+
+// Funções vindas do formulário/API (lista ou texto separado por vírgula); null se tiver alguma inválida
+export function parseRoleInput(v: unknown): Role[] | null {
+  const raw = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : null;
+  if (!raw || raw.some((r) => typeof r !== "string" || !isRole(r.trim()))) return null;
+  const roles = normalizeRoles(raw.map((r: string) => r.trim() as Role));
+  return roles.length ? roles : null;
+}
+
+export function hasRole(role: string, ...any: Role[]) {
+  return parseRoles(role).some((r) => any.includes(r));
+}
+
 // Quem atende ou prepara (acesso a pacientes, prontuários e OS)
 export const CLINICAL_ROLES: Role[] = ["ADMIN", "UNIT_MANAGER", "PROFESSIONAL", "LAB", "PROFESSIONAL_LAB"];
 
-// Clínico e laboratório são marcados como caixas: a pessoa pode ter um ou os dois
-export function roleFromFlags(clinical: boolean, lab: boolean): Role | null {
-  if (clinical && lab) return "PROFESSIONAL_LAB";
-  if (clinical) return "PROFESSIONAL";
-  if (lab) return "LAB";
-  return null;
-}
-
-export function roleFlags(role: string) {
-  return { clinical: role === "PROFESSIONAL" || role === "PROFESSIONAL_LAB", lab: role === "LAB" || role === "PROFESSIONAL_LAB" };
-}
-
 // Perfis da matriz que enxergam todas as unidades (os demais só as suas)
+const ALL_UNITS_ROLES: Role[] = ["ADMIN", "ADMINISTRATIVE", "COMMERCIAL", "STOCK"];
+
 export function seesAllUnits(role: string) {
-  return role === "ADMIN" || role === "ADMINISTRATIVE" || role === "COMMERCIAL" || role === "STOCK";
+  return hasRole(role, ...ALL_UNITS_ROLES);
+}
+
+// Precisa de unidade vinculada quem tem alguma função de unidade (gestor, clínico, laboratório),
+// mesmo que também tenha uma função da matriz — exceto a própria matriz, que já acessa tudo
+export function needsUnits(role: string) {
+  const roles = parseRoles(role);
+  return roles.length > 0 && !roles.includes("ADMIN") && roles.some((r) => !ALL_UNITS_ROLES.includes(r));
 }
 
 export function canManageUsers(role: string) {
-  return role === "ADMIN" || role === "ADMINISTRATIVE" || role === "UNIT_MANAGER";
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER");
 }
 
 // Abrir e editar UABCs
 export function canManageUnits(role: string) {
-  return role === "ADMIN" || role === "ADMINISTRATIVE";
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE");
 }
 
 // Abastecer o estoque das unidades
 export function canSupplyStock(role: string) {
-  return role === "ADMIN" || role === "STOCK";
+  return hasRole(role, "ADMIN", "STOCK");
 }
 
 // Perfis com telas limitadas: só podem abrir estas páginas e só alterar por estas APIs
@@ -65,28 +90,38 @@ const under = (path: string, prefixes: string[]) => prefixes.some((p) => path ==
 // Telas de entrada/conta, liberadas para todos
 const OPEN_PAGES = ["/", "/login", "/trocar-senha", "/conta"];
 
+// Com várias funções vale a soma: basta uma função sem limite para liberar tudo
+function allowed(role: string, map: Partial<Record<Role, string[]>>): string[] | null {
+  const roles = parseRoles(role);
+  if (!roles.length || roles.some((r) => !map[r])) return null;
+  return roles.flatMap((r) => map[r]!);
+}
+
 export function canOpenPage(role: string, path: string) {
-  const pages = isRole(role) ? ROLE_PAGES[role] : undefined;
+  const pages = allowed(role, ROLE_PAGES);
   return !pages || OPEN_PAGES.includes(path) || under(path, pages);
 }
 
 export function homePage(role: string) {
-  return (isRole(role) && ROLE_PAGES[role]?.[0]) || "/dashboard";
+  return allowed(role, ROLE_PAGES)?.[0] || "/dashboard";
 }
 
 export function canWriteApi(role: string, path: string) {
-  const apis = isRole(role) ? ROLE_WRITE_APIS[role] : undefined;
+  const apis = allowed(role, ROLE_WRITE_APIS);
   return !apis || under(path, apis);
 }
 
 // Gestor não cria acesso de matriz nem de estoque central; administrativo cria todos menos a matriz
+// (o antigo "PROFESSIONAL_LAB" não aparece mais: marca-se clínico e laboratório)
 export function assignableRoles(role: string): Role[] {
-  if (role === "ADMIN") return Object.keys(ROLES) as Role[];
-  if (role === "ADMINISTRATIVE") return (Object.keys(ROLES) as Role[]).filter((r) => r !== "ADMIN");
-  if (role === "UNIT_MANAGER") return ["UNIT_MANAGER", "PROFESSIONAL", "LAB", "PROFESSIONAL_LAB"];
+  const all = (Object.keys(ROLES) as Role[]).filter((r) => r !== "PROFESSIONAL_LAB");
+  if (hasRole(role, "ADMIN")) return all;
+  if (hasRole(role, "ADMINISTRATIVE")) return all.filter((r) => r !== "ADMIN");
+  if (hasRole(role, "UNIT_MANAGER")) return ["UNIT_MANAGER", "PROFESSIONAL", "LAB"];
   return [];
 }
 
 export function roleLabel(role: string) {
-  return isRole(role) ? ROLES[role].label : role;
+  const roles = parseRoles(role);
+  return roles.length ? roles.map((r) => ROLES[r].label).join(" + ") : role;
 }

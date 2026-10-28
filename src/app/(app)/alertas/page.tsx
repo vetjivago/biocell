@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { seesAllUnits } from "@/lib/roles";
+import { seesAllUnits, hasRole } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ export default async function AlertasPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = hasRole(session.role, "ADMIN");
   const allUnits = seesAllUnits(session.role);
   const unitFilter = allUnits ? {} : { unitId: { in: session.unitIds } };
   await syncOpenLowStockAlerts(allUnits ? undefined : session.unitIds);

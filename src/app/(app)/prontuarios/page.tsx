@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
+import { hasRole } from "@/lib/roles";
 
 export default async function ProntuariosPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = hasRole(session.role, "ADMIN");
   const records = await prisma.medicalRecord.findMany({
     where: isAdmin ? {} : { unitId: { in: session.unitIds } },
     include: {

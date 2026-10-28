@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
+import { hasRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const unitId = searchParams.get("unitId");
   if (!unitId) return Response.json([]);
-  if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(unitId)) {
     return Response.json([], { status: 403 });
   }
 

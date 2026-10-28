@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { assignableRoles, isRole } from "@/lib/roles";
+import { assignableRoles, normalizeRoles, parseRoles } from "@/lib/roles";
 import { getManageableUser } from "@/lib/users";
 import { formatPhone } from "@/lib/phone";
 import UserForm from "../UserForm";
@@ -16,7 +16,8 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
   const access = await getManageableUser(session, id);
   if ("error" in access) notFound();
   const { user } = access;
-  if (!isRole(user.role)) notFound();
+  const userRoles = parseRoles(user.role);
+  if (!userRoles.length) notFound();
 
   const units = await prisma.unit.findMany({
     where: { active: true, ...(seesAllUnits(session.role) ? {} : { id: { in: session.unitIds } }) },
@@ -35,9 +36,9 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">{user.name}</h1>
       <UserForm
         isSelf={user.id === session.id}
-        roles={roles.includes(user.role) ? roles : [user.role, ...roles]}
+        roles={normalizeRoles([...roles, ...userRoles])}
         units={units}
-        initial={{ id: user.id, name: user.name, email: user.email ?? "", phone: formatPhone(user.phone), role: user.role, unitIds: visibleUnitIds, active: user.active }}
+        initial={{ id: user.id, name: user.name, email: user.email ?? "", phone: formatPhone(user.phone), roles: userRoles, unitIds: visibleUnitIds, active: user.active }}
       />
     </div>
   );

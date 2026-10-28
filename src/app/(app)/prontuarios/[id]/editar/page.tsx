@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { canEditRecord } from "@/lib/record-applications";
 import type { ProductCategory } from "@/lib/products";
 import EditRecordForm, { type StockLot } from "./EditRecordForm";
+import { hasRole } from "@/lib/roles";
 
 export default async function EditarProntuarioPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -22,7 +23,7 @@ export default async function EditarProntuarioPage({ params }: { params: Promise
     },
   });
   if (!record) notFound();
-  if (session.role !== "ADMIN" && !session.unitIds.includes(record.unitId)) notFound();
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(record.unitId)) notFound();
   if (!canEditRecord(session, record)) notFound();
 
   const lotsEditable = record.status === "OPEN" && record._count.inventoryTransactions === 0;

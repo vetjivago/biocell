@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import PatientForm from "../../PatientForm";
+import { hasRole } from "@/lib/roles";
 
 export default async function EditarPacientePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -11,7 +12,7 @@ export default async function EditarPacientePage({ params }: { params: Promise<{
   const { id } = await params;
   const p = await prisma.patient.findUnique({ where: { id } });
   if (!p) notFound();
-  if (session.role !== "ADMIN" && !session.unitIds.includes(p.unitId)) notFound();
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(p.unitId)) notFound();
 
   return (
     <div className="max-w-2xl">

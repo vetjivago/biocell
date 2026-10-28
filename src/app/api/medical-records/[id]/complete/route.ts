@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { syncLowStockAlert } from "@/lib/stock-alerts";
+import { hasRole } from "@/lib/roles";
 
 interface ConsumptionItem {
   batchId: string;
@@ -40,7 +41,7 @@ export async function POST(
 
   if (!record) return Response.json({ error: "Prontuário não encontrado" }, { status: 404 });
 
-  if (session.role !== "ADMIN" && !session.unitIds.includes(record.unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(record.unitId)) {
     return Response.json({ error: "Sem permissão" }, { status: 403 });
   }
 

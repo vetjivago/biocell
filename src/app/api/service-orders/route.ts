@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { nextSerial, optDate, optText } from "@/lib/service-orders";
+import { hasRole } from "@/lib/roles";
 
 // Sugestão do próximo nº de série
 export async function GET() {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     include: { unit: { select: { serviceOrderEnabled: true } } },
   });
   if (!patient) return Response.json({ error: "Paciente não encontrado" }, { status: 404 });
-  if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(patient.unitId)) {
     return Response.json({ error: "Sem permissão" }, { status: 403 });
   }
   if (!patient.unit.serviceOrderEnabled) {

@@ -31,7 +31,7 @@ export default async function NovoUsuarioPage({ searchParams }: { searchParams: 
         initial={{
           name: "", email: "", phone: "",
           // Vindo do cadastro da unidade: já marca a unidade e sugere a função de gestor
-          role: unidade && units.some((u) => u.id === unidade) ? "UNIT_MANAGER" : "PROFESSIONAL",
+          roles: [unidade && units.some((u) => u.id === unidade) ? "UNIT_MANAGER" : "PROFESSIONAL"],
           unitIds: unidade && units.some((u) => u.id === unidade) ? [unidade] : units.length === 1 ? [units[0].id] : [],
           active: true,
         }}

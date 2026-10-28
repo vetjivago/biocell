@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { hasRole } from "./roles";
 
 // Regras das aplicações do prontuário CT (usadas ao criar e ao editar)
 
@@ -89,5 +90,5 @@ export function parseThawings(thawings: unknown) {
 
 // Quem pode alterar/excluir: quem registrou, o gestor da unidade ou a matriz
 export function canEditRecord(session: { id: string; role: string }, record: { professionalId: string }) {
-  return record.professionalId === session.id || session.role === "ADMIN" || session.role === "UNIT_MANAGER";
+  return record.professionalId === session.id || hasRole(session.role, "ADMIN", "UNIT_MANAGER");
 }

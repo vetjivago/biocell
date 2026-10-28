@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { CHECKLIST_TERMS, canDeleteOrder, getAccessibleOrder, optText, parseChecklist } from "@/lib/service-orders";
+import { hasRole } from "@/lib/roles";
 
 // Edita dados gerais da OS, o checklist ("solicitado") ou cancela
 export async function PATCH(
@@ -28,7 +29,7 @@ export async function PATCH(
     data.checklist = JSON.stringify(current);
   }
   if (typeof body.cancelled === "boolean") {
-    if (session.role !== "ADMIN" && session.role !== "UNIT_MANAGER") {
+    if (!hasRole(session.role, "ADMIN", "UNIT_MANAGER")) {
       return Response.json({ error: "Só o gestor da unidade ou a matriz podem cancelar" }, { status: 403 });
     }
     data.cancelled = body.cancelled;

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { assignableRoles, isRole, seesAllUnits } from "@/lib/roles";
+import { assignableRoles, needsUnits, parseRoleInput, parseRoles, seesAllUnits, serializeRoles } from "@/lib/roles";
 import { getManageableUser, loginTakenError, parseLoginFields, validateUnitIds } from "@/lib/users";
 
 // Edita nome, e-mail/celular de login, função, unidades ou ativa/desativa o acesso
@@ -29,12 +29,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (login.email !== user.email) data.email = login.email;
     if (login.phone !== user.phone) data.phone = login.phone;
   }
-  if (body.role !== undefined && body.role !== user.role) {
-    if (isSelf) return Response.json({ error: "Você não pode mudar a sua própria função" }, { status: 400 });
-    if (!isRole(body.role) || !assignableRoles(session.role).includes(body.role)) {
-      return Response.json({ error: "Função não permitida" }, { status: 403 });
+  if (body.role !== undefined) {
+    const roles = parseRoleInput(body.role);
+    if (!roles) return Response.json({ error: "Escolha ao menos uma função" }, { status: 400 });
+    const role = serializeRoles(roles);
+    if (role !== serializeRoles(parseRoles(user.role))) {
+      if (isSelf) return Response.json({ error: "Você não pode mudar a sua própria função" }, { status: 400 });
+      // Só pode incluir ou tirar funções que quem edita pode atribuir
+      const before = parseRoles(user.role);
+      const changed = [...roles.filter((r) => !before.includes(r)), ...before.filter((r) => !roles.includes(r))];
+      if (changed.some((r) => !assignableRoles(session.role).includes(r))) {
+        return Response.json({ error: "Função não permitida" }, { status: 403 });
+      }
+      data.role = role;
     }
-    data.role = body.role;
   }
   if (typeof body.active === "boolean" && body.active !== user.active) {
     if (isSelf) return Response.json({ error: "Você não pode desativar o seu próprio acesso" }, { status: 400 });
@@ -49,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const current = user.units.map((u) => u.unitId);
     const outside = seesAllUnits(session.role) ? [] : current.filter((u) => !session.unitIds.includes(u));
     nextUnitIds = [...new Set([...outside, ...units.ids])];
-    if (!seesAllUnits(data.role ?? user.role) && nextUnitIds.length === 0) {
+    if (needsUnits(data.role ?? user.role) && nextUnitIds.length === 0) {
       return Response.json({ error: "Escolha ao menos uma unidade" }, { status: 400 });
     }
   }

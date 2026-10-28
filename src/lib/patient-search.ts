@@ -1,4 +1,5 @@
 import type { SessionUser } from "./auth";
+import { hasRole } from "./roles";
 
 export const SEARCH_FIELDS = {
   all: { label: "Todos os campos", placeholder: "Buscar por animal, responsável, veterinário, clínica..." },
@@ -20,7 +21,7 @@ export function parseSearchField(campo: string | null | undefined): SearchField 
 // Filtro de pacientes respeitando as unidades do usuário
 export function patientSearchWhere(session: SessionUser, rawQ: string | null | undefined, field: SearchField) {
   const q = rawQ?.trim();
-  const isAdmin = session.role === "ADMIN";
+  const isAdmin = hasRole(session.role, "ADMIN");
   return {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
     ...(q
@@ -32,5 +33,5 @@ export function patientSearchWhere(session: SessionUser, rawQ: string | null | u
 }
 
 export function canAccessUnit(session: SessionUser, unitId: string) {
-  return session.role === "ADMIN" || session.unitIds.includes(unitId);
+  return hasRole(session.role, "ADMIN") || session.unitIds.includes(unitId);
 }

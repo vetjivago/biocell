@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import NewOrderForm from "../NewOrderForm";
 import { nextSerial } from "@/lib/service-orders";
+import { hasRole } from "@/lib/roles";
 
 export default async function NovaOrdemPage({
   searchParams,
@@ -24,7 +25,7 @@ export default async function NovaOrdemPage({
     },
   });
   if (!patient || !patient.unit.serviceOrderEnabled) notFound();
-  if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) notFound();
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(patient.unitId)) notFound();
 
   const last = await prisma.serviceOrder.findMany({ select: { serialNumber: true }, orderBy: { createdAt: "desc" }, take: 200 });
 

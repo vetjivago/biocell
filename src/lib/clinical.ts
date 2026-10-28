@@ -5,6 +5,7 @@ export * from "./clinical-types";
 import { CONTENT_OPTIONAL, isHttpUrl, type EntryType } from "./clinical-types";
 import { htmlToText } from "./rich-text";
 import { sanitizeRichText } from "./rich-text-server";
+import { hasRole } from "./roles";
 
 // Paciente acessível pelo usuário e com prontuário geral habilitado na unidade
 export async function getGeneralRecordPatient(session: SessionUser, patientId: string) {
@@ -13,7 +14,7 @@ export async function getGeneralRecordPatient(session: SessionUser, patientId: s
     include: { unit: { select: { id: true, name: true, generalRecordEnabled: true } } },
   });
   if (!patient) return { error: "Paciente não encontrado", status: 404 } as const;
-  if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(patient.unitId)) {
     return { error: "Sem permissão", status: 403 } as const;
   }
   if (!patient.unit.generalRecordEnabled) {
@@ -24,7 +25,7 @@ export async function getGeneralRecordPatient(session: SessionUser, patientId: s
 
 // Autor do registro, gestor da unidade ou matriz podem editar
 export function canEditEntry(session: SessionUser, entry: { authorId: string }) {
-  return entry.authorId === session.id || session.role === "ADMIN" || session.role === "UNIT_MANAGER";
+  return entry.authorId === session.id || hasRole(session.role, "ADMIN", "UNIT_MANAGER");
 }
 
 type EntryFields = {

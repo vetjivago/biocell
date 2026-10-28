@@ -12,6 +12,7 @@ import { formatAge } from "@/lib/patient-fields";
 import { htmlToText } from "@/lib/rich-text";
 import PrintButton from "./geral/PrintButton";
 import PhotoUpload from "./PhotoUpload";
+import { hasRole } from "@/lib/roles";
 
 const ENTRY_ICONS: Record<EntryType, typeof Stethoscope> = {
   ATENDIMENTO: Stethoscope,
@@ -71,7 +72,7 @@ export default async function PacienteDetailPage({
   });
 
   if (!patient) notFound();
-  if (session.role !== "ADMIN" && !session.unitIds.includes(patient.unitId)) notFound();
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(patient.unitId)) notFound();
 
   const generalEnabled = patient.unit.generalRecordEnabled;
   const tab = generalEnabled && aba !== "ct" ? "geral" : "ct";

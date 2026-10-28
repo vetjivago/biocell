@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateTempPassword, getSession, hashPassword } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { assignableRoles, canManageUsers, isRole, seesAllUnits } from "@/lib/roles";
+import { assignableRoles, canManageUsers, needsUnits, parseRoleInput, serializeRoles } from "@/lib/roles";
 import { sendAccessEmail } from "@/lib/mailer";
 import { loginTakenError, manageableUsersWhere, parseLoginFields, validateUnitIds } from "@/lib/users";
 
@@ -33,12 +33,15 @@ export async function POST(request: NextRequest) {
   const login = parseLoginFields(body);
   if ("error" in login) return Response.json({ error: login.error }, { status: 400 });
   const { email, phone } = login;
-  if (!isRole(body.role) || !assignableRoles(session.role).includes(body.role)) {
+  const roles = parseRoleInput(body.role);
+  if (!roles) return Response.json({ error: "Escolha ao menos uma função" }, { status: 400 });
+  if (roles.some((r) => !assignableRoles(session.role).includes(r))) {
     return Response.json({ error: "Função não permitida" }, { status: 403 });
   }
+  const role = serializeRoles(roles);
   const units = await validateUnitIds(session, body.unitIds ?? []);
   if ("error" in units) return Response.json({ error: units.error }, { status: 400 });
-  if (!seesAllUnits(body.role) && units.ids.length === 0) {
+  if (needsUnits(role) && units.ids.length === 0) {
     return Response.json({ error: "Escolha ao menos uma unidade" }, { status: 400 });
   }
   const taken = await loginTakenError({ email, phone });
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
-        name, email, phone, role: body.role,
+        name, email, phone, role,
         organizationId: session.organizationId,
         passwordHash: await hashPassword(tempPassword),
         mustChangePassword: true,
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, name: true, email: true, phone: true, role: true },
     });
     await tx.auditLog.create({
-      data: { userId: session.id, action: "CREATE", entity: "User", entityId: created.id, details: JSON.stringify({ email, phone, role: body.role, unitIds: units.ids }) },
+      data: { userId: session.id, action: "CREATE", entity: "User", entityId: created.id, details: JSON.stringify({ email, phone, role, unitIds: units.ids }) },
     });
     return created;
   });

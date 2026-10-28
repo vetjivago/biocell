@@ -3,13 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, KeyRound, Mail, MessageCircle, Trash2 } from "lucide-react";
-import { ROLES, roleFlags, roleFromFlags, seesAllUnits, type Role } from "@/lib/roles";
+import { ROLES, needsUnits as roleNeedsUnits, normalizeRoles, serializeRoles, type Role } from "@/lib/roles";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 
-const TEAM_ROLES: Role[] = ["PROFESSIONAL", "LAB", "PROFESSIONAL_LAB"];
-
 interface Unit { id: string; name: string; city: string; state: string }
-interface Initial { id?: string; name: string; email: string; phone: string; role: Role; unitIds: string[]; active: boolean }
+interface Initial { id?: string; name: string; email: string; phone: string; roles: Role[]; unitIds: string[]; active: boolean }
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-sm font-medium text-gray-700 mb-1";
@@ -72,14 +70,14 @@ export default function UserForm({
     const q = filter.trim().toLowerCase();
     return q ? units.filter((u) => `${u.name} ${u.city} ${u.state}`.toLowerCase().includes(q)) : units;
   }, [units, filter]);
-  const needsUnits = !seesAllUnits(form.role);
-  const flags = roleFlags(form.role);
+  const needsUnits = roleNeedsUnits(serializeRoles(form.roles));
 
-  // Desmarcar a única caixa marcada não deixa a pessoa sem função
-  function toggleTeamRole(k: "clinical" | "lab") {
-    const next = { ...flags, [k]: !flags[k] };
-    const role = roleFromFlags(next.clinical, next.lab);
-    if (role) setForm((f) => ({ ...f, role }));
+  // Várias funções podem ser marcadas juntas; desmarcar a única marcada não deixa a pessoa sem função
+  function toggleRole(r: Role) {
+    setForm((f) => {
+      const roles = f.roles.includes(r) ? f.roles.filter((x) => x !== r) : normalizeRoles([...f.roles, r]);
+      return roles.length ? { ...f, roles } : f;
+    });
   }
 
   function toggleUnit(id: string) {
@@ -98,7 +96,7 @@ export default function UserForm({
         name: form.name,
         email: form.email,
         phone: form.phone,
-        role: form.role,
+        role: form.roles,
         unitIds: needsUnits ? form.unitIds : [],
         ...(isEdit ? { active: form.active } : {}),
       }),
@@ -167,34 +165,20 @@ export default function UserForm({
       </div>
 
       <div>
-        <p className={label}>Função *</p>
+        <p className={label}>Funções * <span className="font-normal text-gray-400">(marque uma ou mais)</span></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {roles.filter((r) => !TEAM_ROLES.includes(r)).map((r) => (
-            <label key={r} className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${form.role === r ? "border-primary bg-primary/5" : "border-gray-200"} ${isSelf ? "opacity-60 cursor-not-allowed" : ""}`}>
-              <input type="radio" name="role" checked={form.role === r} disabled={isSelf} onChange={() => setForm((f) => ({ ...f, role: r }))} className="mt-0.5" />
+          {roles.filter((r) => r !== "PROFESSIONAL_LAB").map((r) => (
+            <label key={r} className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${form.roles.includes(r) ? "border-primary bg-primary/5" : "border-gray-200"} ${isSelf ? "opacity-60 cursor-not-allowed" : ""}`}>
+              <input type="checkbox" checked={form.roles.includes(r)} disabled={isSelf} onChange={() => toggleRole(r)} className="mt-0.5 rounded border-gray-300" />
               <span>
                 <span className="block text-sm font-medium text-gray-900">{ROLES[r].label}</span>
                 <span className="block text-xs text-gray-500">{ROLES[r].description}</span>
               </span>
             </label>
           ))}
-          {/* Clínico e laboratório: marque um ou os dois */}
-          {(["clinical", "lab"] as const).map((k) => {
-            const r: Role = k === "clinical" ? "PROFESSIONAL" : "LAB";
-            if (!roles.includes(r)) return null;
-            return (
-              <label key={r} className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer ${flags[k] ? "border-primary bg-primary/5" : "border-gray-200"} ${isSelf ? "opacity-60 cursor-not-allowed" : ""}`}>
-                <input type="checkbox" checked={flags[k]} disabled={isSelf} onChange={() => toggleTeamRole(k)} className="mt-0.5 rounded border-gray-300" />
-                <span>
-                  <span className="block text-sm font-medium text-gray-900">{ROLES[r].label}</span>
-                  <span className="block text-xs text-gray-500">{ROLES[r].description}</span>
-                </span>
-              </label>
-            );
-          })}
         </div>
-        {flags.clinical && flags.lab && (
-          <p className="text-xs text-gray-500 mt-1">Esta pessoa terá os dois acessos: veterinário clínico e laboratório.</p>
+        {form.roles.length > 1 && (
+          <p className="text-xs text-gray-500 mt-1">Esta pessoa terá os acessos de todas as funções marcadas: {form.roles.map((r) => ROLES[r].label).join(" + ")}.</p>
         )}
       </div>
 

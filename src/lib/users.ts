@@ -1,17 +1,28 @@
 import { prisma } from "./prisma";
 import type { SessionUser } from "./auth";
-import { assignableRoles, canManageUsers, seesAllUnits } from "./roles";
+import { ROLES, assignableRoles, canManageUsers, seesAllUnits, hasRole, type Role } from "./roles";
 import { normalizePhone } from "./phone";
+
+// Acessos que têm alguma destas funções (a coluna guarda várias, separadas por vírgula)
+function withAnyRole(roles: Role[]) {
+  return roles.flatMap((r) => [{ role: r }, { role: { startsWith: `${r},` } }, { role: { endsWith: `,${r}` } }, { role: { contains: `,${r},` } }]);
+}
+
+// Funções que quem está logado não pode atribuir: acessos com alguma delas ficam fora do alcance
+function notAssignable(session: SessionUser) {
+  const allowed = [...assignableRoles(session.role), ...(hasRole(session.role, "UNIT_MANAGER") ? ["PROFESSIONAL_LAB" as Role] : [])];
+  return (Object.keys(ROLES) as Role[]).filter((r) => !allowed.includes(r));
+}
 
 // Usuários que quem está logado pode ver/gerenciar
 export function manageableUsersWhere(session: SessionUser) {
-  if (session.role === "ADMIN") return { deletedAt: null };
+  if (hasRole(session.role, "ADMIN")) return { deletedAt: null };
   // Administrativo: todos os acessos, menos os da matriz
-  if (session.role === "ADMINISTRATIVE") return { deletedAt: null, role: { in: assignableRoles(session.role) } };
+  if (hasRole(session.role, "ADMINISTRATIVE")) return { deletedAt: null, NOT: { OR: withAnyRole(notAssignable(session)) } };
   // Gestor: equipe das suas unidades, sem acessos de matriz/estoque central
   return {
     deletedAt: null,
-    role: { in: assignableRoles(session.role) },
+    NOT: { OR: withAnyRole(notAssignable(session)) },
     units: { some: { unitId: { in: session.unitIds } } },
   };
 }

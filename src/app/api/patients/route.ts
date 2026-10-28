@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { parseSearchField, patientSearchWhere } from "@/lib/patient-search";
 import { parsePatientFields } from "@/lib/patient-fields";
+import { hasRole } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   const parsed = parsePatientFields(body);
   if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
 
-  if (session.role !== "ADMIN" && !session.unitIds.includes(unitId)) {
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(unitId)) {
     return Response.json({ error: "Sem permissão para esta unidade" }, { status: 403 });
   }
 

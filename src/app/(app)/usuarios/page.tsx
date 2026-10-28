@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { canManageUsers, roleLabel, seesAllUnits } from "@/lib/roles";
+import { canManageUsers, needsUnits, roleLabel, seesAllUnits } from "@/lib/roles";
 import { manageableUsersWhere } from "@/lib/users";
 
 export default async function UsuariosPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -64,7 +64,7 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">{roleLabel(u.role)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {seesAllUnits(u.role) ? "Todas" : u.units.map((x) => x.unit.name.replace(/^UABC\s+/i, "")).join(", ") || "–"}
+                  {!needsUnits(u.role) ? "Todas" : u.units.map((x) => x.unit.name.replace(/^UABC\s+/i, "")).join(", ") || "–"}
                 </td>
                 <td className="px-4 py-3">
                   {!u.active ? (
