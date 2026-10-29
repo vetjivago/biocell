@@ -82,6 +82,8 @@ export default async function OrdemPage({ params }: { params: Promise<{ id: stri
           <p><span className="font-semibold text-gray-700 inline-block w-28">Raça:</span>{p.breed || "-"}</p>
           <p><span className="font-semibold text-gray-700 inline-block w-28">Responsável:</span>{p.ownerName}</p>
           <p><span className="font-semibold text-gray-700 inline-block w-28">Telefone:</span>{p.ownerPhone || "-"}</p>
+          <p><span className="font-semibold text-gray-700 inline-block w-28">CPF:</span>{p.ownerCpf || "-"}</p>
+          <p className="sm:col-span-2"><span className="font-semibold text-gray-700 inline-block w-28">Endereço:</span>{p.ownerAddress || "-"}</p>
         </div>
 
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">

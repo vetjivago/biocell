@@ -18,7 +18,7 @@ export function formatAge(birth: Date | null | undefined, now = new Date()) {
 
 const PATIENT_TEXT_FIELDS = {
   name: 120, breed: 120, ownerName: 160, ownerPhone: 40, ownerEmail: 160,
-  veterinarian: 160, clinic: 160, coat: 80, microchip: 40, ownerAddress: 300,
+  veterinarian: 160, clinic: 160, coat: 80, microchip: 40, ownerAddress: 300, ownerCpf: 20,
 } as const;
 
 // Normaliza os campos do cadastro do paciente (criação e edição)

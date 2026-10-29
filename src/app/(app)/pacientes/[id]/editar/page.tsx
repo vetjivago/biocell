@@ -27,7 +27,7 @@ export default async function EditarPacientePage({ params }: { params: Promise<{
           neutered: p.neutered, coat: p.coat || "", birthDate: p.birthDate ? p.birthDate.toISOString().slice(0, 10) : "",
           weight: p.weight?.toString().replace(".", ",") || "", microchip: p.microchip || "",
           ownerName: p.ownerName, ownerPhone: p.ownerPhone || "", ownerEmail: p.ownerEmail || "",
-          ownerAddress: p.ownerAddress || "", veterinarian: p.veterinarian || "", clinic: p.clinic || "",
+          ownerAddress: p.ownerAddress || "", ownerCpf: p.ownerCpf || "", veterinarian: p.veterinarian || "", clinic: p.clinic || "",
         }}
       />
     </div>

@@ -18,13 +18,14 @@ export interface PatientFormValues {
   ownerPhone: string;
   ownerEmail: string;
   ownerAddress: string;
+  ownerCpf: string;
   veterinarian: string;
   clinic: string;
 }
 
 export const EMPTY_PATIENT: PatientFormValues = {
   unitId: "", name: "", species: "Canino", breed: "", sex: "", neutered: false, coat: "", birthDate: "",
-  weight: "", microchip: "", ownerName: "", ownerPhone: "", ownerEmail: "", ownerAddress: "", veterinarian: "", clinic: "",
+  weight: "", microchip: "", ownerName: "", ownerPhone: "", ownerEmail: "", ownerAddress: "", ownerCpf: "", veterinarian: "", clinic: "",
 };
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
@@ -103,7 +104,8 @@ export default function PatientForm({ patientId, initial }: { patientId?: string
         <div><label className={label}>Nome *</label><input required value={form.ownerName} onChange={set("ownerName")} className={input} /></div>
         <div><label className={label}>Telefone</label><input type="tel" value={form.ownerPhone} onChange={set("ownerPhone")} className={input} placeholder="(61) 90000-0000" /></div>
         <div><label className={label}>E-mail</label><input type="email" value={form.ownerEmail} onChange={set("ownerEmail")} className={input} /></div>
-        <div><label className={label}>Endereço</label><input value={form.ownerAddress} onChange={set("ownerAddress")} className={input} /></div>
+        <div><label className={label}>CPF</label><input inputMode="numeric" value={form.ownerCpf} onChange={set("ownerCpf")} className={input} placeholder="000.000.000-00" /></div>
+        <div className="sm:col-span-2"><label className={label}>Endereço</label><input value={form.ownerAddress} onChange={set("ownerAddress")} className={input} placeholder="Rua, número, bairro, cidade/UF, CEP" /></div>
       </div>
 
       <hr className="my-2" />

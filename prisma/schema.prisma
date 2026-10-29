@@ -112,6 +112,7 @@ model Patient {
   birthDate       DateTime?
   microchip       String?
   ownerAddress    String?
+  ownerCpf        String?
   unitId          String
   unit            Unit     @relation(fields: [unitId], references: [id])
   createdAt       DateTime @default(now())

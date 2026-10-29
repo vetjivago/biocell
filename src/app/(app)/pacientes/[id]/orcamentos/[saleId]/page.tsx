@@ -115,7 +115,9 @@ export default async function OrcamentoPage({
         <div className="border border-gray-200 rounded p-3 mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <p><span className="font-semibold text-gray-700">Tutor: </span>{p.ownerName}</p>
           <p><span className="font-semibold text-gray-700">Telefone: </span>{p.ownerPhone || "-"}</p>
-          {p.ownerEmail && <p className="sm:col-span-2"><span className="font-semibold text-gray-700">E-mail: </span>{p.ownerEmail}</p>}
+          <p><span className="font-semibold text-gray-700">CPF: </span>{p.ownerCpf || "-"}</p>
+          {p.ownerEmail && <p><span className="font-semibold text-gray-700">E-mail: </span>{p.ownerEmail}</p>}
+          <p className="sm:col-span-2"><span className="font-semibold text-gray-700">Endereço: </span>{p.ownerAddress || "-"}</p>
           <p><span className="font-semibold text-gray-700">Paciente: </span>{p.name}</p>
           <p><span className="font-semibold text-gray-700">Espécie/raça: </span>{[p.species, p.breed].filter(Boolean).join(", ")}</p>
           {(age || p.weight) && (

@@ -193,6 +193,7 @@ export default async function PacienteDetailPage({
               {patient.ownerEmail && (
                 <a href={`mailto:${patient.ownerEmail}`} className="flex items-center gap-1.5 text-primary hover:underline break-all"><Mail size={13} />{patient.ownerEmail}</a>
               )}
+              {patient.ownerCpf && <p>CPF: {patient.ownerCpf}</p>}
               {patient.ownerAddress && <p className="flex items-start gap-1.5"><MapPin size={13} className="mt-0.5 shrink-0" />{patient.ownerAddress}</p>}
               {(patient.veterinarian || patient.clinic) && (
                 <p className="text-gray-500">Vet.: {[patient.veterinarian, patient.clinic].filter(Boolean).join(" · ")}</p>
