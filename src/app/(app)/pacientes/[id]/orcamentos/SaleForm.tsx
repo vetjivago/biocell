@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
-import { formatBRL, formatMoneyInput, parseMoney } from "@/lib/sales-types";
+import { Lock, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { fold, formatBRL, formatMoneyInput, parseMoney } from "@/lib/sales-types";
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
 const label = "block text-xs font-medium text-gray-500 mb-1";
 
+type Suggestion = { description: string; unitPrice: number; fixed: boolean; catalog: boolean };
 type Item = { key: number; description: string; quantity: number; unitPrice: string };
 export type SaleFormInitial = {
   items: { description: string; quantity: number; unitPrice: number }[];
@@ -32,8 +33,15 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
   // Busca de produto/serviço (como no SimplesVet): quantidade + nome; clique na linha para adicionar
   const [qty, setQty] = useState(1);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<{ description: string; unitPrice: number }[] | null>(null);
+  const [results, setResults] = useState<Suggestion[] | null>(null);
   const searchSeq = useRef(0);
+  // Tabela de preços da matriz: os mais usados aparecem de cara; com valor fixo, o preço fica travado
+  const [catalog, setCatalog] = useState<Suggestion[]>([]);
+  const fixedPrice = (description: string) => catalog.find((c) => c.fixed && fold(c.description) === fold(description))?.unitPrice;
+
+  useEffect(() => {
+    fetch("/api/sales/items").then((r) => r.json()).then((d) => setCatalog(d.items || [])).catch(() => {});
+  }, []);
 
   async function search(q: string) {
     const seq = ++searchSeq.current;
@@ -57,7 +65,9 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
 
   const update = (key: number, patch: Partial<Item>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch } : i)));
 
-  const subtotal = items.reduce((s, i) => s + i.quantity * (parseMoney(i.unitPrice) ?? 0), 0);
+  // Preço do item: o fixo da tabela, se houver; senão o digitado
+  const priceOf = (i: Item) => fixedPrice(i.description) ?? parseMoney(i.unitPrice);
+  const subtotal = items.reduce((s, i) => s + i.quantity * (priceOf(i) ?? 0), 0);
   const discountCents = parseMoney(discount) ?? 0;
   const total = Math.max(0, subtotal - discountCents);
   const typed = query.trim();
@@ -69,7 +79,7 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
     try {
       const body = {
         patientId,
-        items: items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })),
+        items: items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: fixedPrice(i.description) !== undefined ? formatMoneyInput(fixedPrice(i.description)!) : i.unitPrice })),
         validUntil: validUntil || null,
         notes,
         discount,
@@ -123,7 +133,10 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
                   <button type="button" onClick={() => addItem(r.description, r.unitPrice)}
                     className="w-full flex justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-gray-50">
                     <span className="text-gray-800">{r.description}</span>
-                    <span className="text-gray-600 shrink-0">{formatBRL(r.unitPrice)}</span>
+                    <span className="text-gray-600 shrink-0 flex items-center gap-1">
+                      {r.fixed && <Lock size={12} className="text-gray-400" />}
+                      {r.fixed || r.unitPrice ? formatBRL(r.unitPrice) : "valor livre"}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -138,9 +151,24 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
             </ul>
           </div>
         )}
+        {!typed && catalog.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-medium text-gray-500 mb-2">Mais usados (clique para adicionar)</p>
+            <div className="flex flex-wrap gap-2">
+              {catalog.map((c) => (
+                <button key={c.description} type="button" onClick={() => addItem(c.description, c.unitPrice)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-full text-sm text-gray-700 hover:border-primary hover:bg-primary/5">
+                  <Plus size={12} /> {c.description}
+                  <span className="text-gray-500">{c.fixed ? formatBRL(c.unitPrice) : "valor livre"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {!typed && (
           <p className="mt-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-800 text-xs">
-            Digite o nome do produto ou serviço. Aparecem os itens já usados em outros orçamentos, com o último valor; se não existir, adicione como novo item.
+            Digite o nome do produto ou serviço. Aparecem os itens da tabela de preços e os já usados em outros orçamentos, com o último valor; se não existir, adicione como novo item.
+            Itens com <Lock size={10} className="inline" /> têm valor fixo definido pela matriz.
           </p>
         )}
       </div>
@@ -154,20 +182,29 @@ export default function SaleForm({ patientId, saleId, initial }: { patientId: st
             <div className="hidden sm:grid grid-cols-[1fr_90px_130px_110px_36px] gap-2 text-xs font-medium text-gray-500 px-1">
               <span>Descrição</span><span>Qtd.</span><span>Valor unit. (R$)</span><span className="text-right">Total</span><span />
             </div>
-            {items.map((i) => (
+            {items.map((i) => {
+              const fixed = fixedPrice(i.description);
+              return (
               <div key={i.key} className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_90px_130px_110px_36px] gap-2 items-center border-b sm:border-0 border-gray-100 pb-3 sm:pb-0">
                 <input value={i.description} onChange={(e) => update(i.key, { description: e.target.value })} aria-label="Descrição"
-                  className={`${input} col-span-2 sm:col-span-1`} />
+                  readOnly={fixed !== undefined} className={`${input} col-span-2 sm:col-span-1 ${fixed !== undefined ? "bg-gray-50" : ""}`} />
                 <input type="number" min={1} max={9999} value={i.quantity} aria-label="Quantidade"
                   onChange={(e) => update(i.key, { quantity: Math.min(9999, Math.max(1, Math.floor(Number(e.target.value) || 1))) })}
                   className={input} />
-                <input inputMode="decimal" value={i.unitPrice} onChange={(e) => update(i.key, { unitPrice: e.target.value })} aria-label="Valor unitário"
-                  className={`${input} ${parseMoney(i.unitPrice) === null ? "border-red-400" : ""}`} />
-                <span className="text-sm text-right text-gray-800">{formatBRL(i.quantity * (parseMoney(i.unitPrice) ?? 0))}</span>
+                {fixed !== undefined ? (
+                  <span className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-700" title="Valor fixo da tabela de preços">
+                    <Lock size={12} className="text-gray-400" /> {formatMoneyInput(fixed)}
+                  </span>
+                ) : (
+                  <input inputMode="decimal" value={i.unitPrice} onChange={(e) => update(i.key, { unitPrice: e.target.value })} aria-label="Valor unitário"
+                    className={`${input} ${parseMoney(i.unitPrice) === null ? "border-red-400" : ""}`} />
+                )}
+                <span className="text-sm text-right text-gray-800">{formatBRL(i.quantity * (priceOf(i) ?? 0))}</span>
                 <button type="button" aria-label={`Remover ${i.description}`} onClick={() => setItems((list) => list.filter((x) => x.key !== i.key))}
                   className="justify-self-end p-2 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

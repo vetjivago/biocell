@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getGeneralRecordPatient } from "@/lib/clinical";
 import { parseQuoteFields } from "@/lib/sales";
+import { applyFixedPrices } from "@/lib/price-items";
 import { NextRequest } from "next/server";
 
 // Cria o orçamento do paciente
@@ -16,7 +17,12 @@ export async function POST(request: NextRequest) {
 
   const parsed = parseQuoteFields(body);
   if ("error" in parsed) return Response.json({ error: parsed.error }, { status: 400 });
-  const { items = [], ...fields } = parsed.data;
+  const { items: typed = [], ...fields } = parsed.data;
+  // Itens da tabela de preços com valor fixo: vale o valor da tabela
+  const items = await applyFixedPrices(typed);
+  if ((fields.discount ?? 0) > items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)) {
+    return Response.json({ error: "O desconto não pode ser maior que o subtotal" }, { status: 400 });
+  }
 
   const sale = await prisma.$transaction(async (tx) => {
     const created = await tx.sale.create({

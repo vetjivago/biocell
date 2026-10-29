@@ -540,6 +540,17 @@ model Sale {
   @@index([status])
 }
 
+// Tabela de preços (só a matriz edita): com valor, o item entra no orçamento com preço travado;
+// sem valor, só aparece na busca e o preço fica livre. Valores em centavos
+model PriceItem {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  price     Int?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model SaleItem {
   id          String @id @default(cuid())
   saleId      String

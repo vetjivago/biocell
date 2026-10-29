@@ -14,6 +14,7 @@ import {
   Menu,
   FlaskConical,
   UserCog,
+  Tag,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] as Role[] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
+  { href: "/precos", label: "Tabela de preços", icon: Tag, roles: ["ADMIN"] as Role[] },
   { href: "/alertas", label: "Alertas", icon: AlertTriangle, roles: null },
   { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] as Role[] },
 ];

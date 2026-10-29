@@ -27,6 +27,9 @@ export function defaultValidUntil() {
   return new Date(Date.now() + DEFAULT_VALIDITY_DAYS * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
+// Sem acento e minúsculo: "ureia" encontra "Uréia" (compara itens com a tabela de preços)
+export const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
+
 export type SaleItemInput = { description: string; quantity: number; unitPrice: number };
 
 // Valores em centavos

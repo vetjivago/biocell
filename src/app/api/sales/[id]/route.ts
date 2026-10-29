@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { canManageSale, getAccessibleSale, parsePayment, parseQuoteFields } from "@/lib/sales";
+import { applyFixedPrices } from "@/lib/price-items";
 import { NextRequest } from "next/server";
 
 // action:
@@ -38,6 +39,8 @@ export async function PATCH(
     const parsed = parseQuoteFields(body, { partial: true });
     if ("error" in parsed) return fail(parsed.error);
     ({ items, ...data } = parsed.data);
+    // Itens da tabela de preços com valor fixo: vale o valor da tabela
+    if (items) items = await applyFixedPrices(items);
     if (sale.status === "SALE" && items) return fail("Os itens de uma venda não podem ser alterados. Desfaça a venda para editar", 409);
     const subtotal = (items ?? sale.items).reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     if (((data.discount as number | undefined) ?? sale.discount) > subtotal) return fail("O desconto não pode ser maior que o subtotal");
