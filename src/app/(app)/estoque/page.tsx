@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { canSupplyStock, seesAllUnits } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -6,6 +7,7 @@ import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syrin
 import SupplyForm from "./SupplyForm";
 import ReverseButton from "./ReverseButton";
 import { NO_LOT, STANDARD_PRODUCTS } from "@/lib/products";
+import { canTraceBatches } from "@/lib/batch-trace";
 
 const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a" };
 
@@ -49,6 +51,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
 
   // Recebimentos já estornados não mostram o botão de novo
   const canSupply = canSupplyStock(session.role);
+  const canTrace = canTraceBatches(session.role);
   const reversedIds = new Set(
     canSupply
       ? (await prisma.auditLog.findMany({
@@ -68,6 +71,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       return {
         unitId: g.unitId,
         unitName: unitMap[g.unitId] || "",
+        batchId: g.batchId,
         batchNumber: batch?.batchNumber || "",
         productName: batch?.product.name || "",
         category: batch?.product.category || "CELULAS",
@@ -237,7 +241,11 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                               {s.productName}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-sm font-mono text-gray-600">{s.batchNumber === NO_LOT ? "–" : s.batchNumber}</td>
+                          <td className="px-4 py-2.5 text-sm font-mono text-gray-600">
+                            {s.batchNumber === NO_LOT ? "–" : canTrace
+                              ? <Link href={`/rastreabilidade/${s.batchId}`} className="hover:text-primary hover:underline" title="Rastrear lote">{s.batchNumber}</Link>
+                              : s.batchNumber}
+                          </td>
                           <td className={`px-4 py-2.5 text-sm ${expired ? "text-red-600 font-medium" : "text-gray-600"}`}>
                             {s.expirationDate ? new Date(s.expirationDate).toLocaleDateString("pt-BR") : "–"}{expired ? " (vencido)" : ""}
                           </td>

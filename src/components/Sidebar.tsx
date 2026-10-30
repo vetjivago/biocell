@@ -15,6 +15,7 @@ import {
   FlaskConical,
   UserCog,
   Tag,
+  ScanSearch,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/pacientes", label: "Pacientes", icon: Users, roles: CLINICAL_ROLES },
   { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: CLINICAL_ROLES, serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
+  { href: "/rastreabilidade", label: "Rastreabilidade", icon: ScanSearch, roles: ["ADMIN", "STOCK", "UNIT_MANAGER"] as Role[] },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] as Role[] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
   { href: "/precos", label: "Tabela de preços", icon: Tag, roles: ["ADMIN"] as Role[] },
