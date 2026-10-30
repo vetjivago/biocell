@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe } from "lucide-react";
 import SupplyForm from "./SupplyForm";
+import ReverseButton from "./ReverseButton";
 import { NO_LOT, STANDARD_PRODUCTS } from "@/lib/products";
 
 const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a" };
@@ -45,6 +46,17 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       take: 20,
     }),
   ]);
+
+  // Recebimentos já estornados não mostram o botão de novo
+  const canSupply = canSupplyStock(session.role);
+  const reversedIds = new Set(
+    canSupply
+      ? (await prisma.auditLog.findMany({
+          where: { action: "REVERSAL", entity: "InventoryTransaction", entityId: { in: recentTransactions.map((t) => t.id) } },
+          select: { entityId: true },
+        })).map((a) => a.entityId)
+      : [],
+  );
 
   const batchMap = Object.fromEntries(batches.map((b) => [b.id, b]));
   const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
@@ -117,7 +129,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
             {isAdmin ? "Visão consolidada de todas as unidades" : "Estoque da sua unidade"}
           </p>
         </div>
-        {canSupplyStock(session.role) && <Suspense><SupplyForm /></Suspense>}
+        {canSupply && <Suspense><SupplyForm /></Suspense>}
       </div>
 
       {/* Resumo: palhetas por espécie + insumos */}
@@ -259,6 +271,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto / Lote</th>
               <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Qtd</th>
               <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Saldo</th>
+              {canSupply && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody>
@@ -276,6 +289,14 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                     {t.quantity > 0 ? `+${t.quantity}` : t.quantity}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-600">{t.balance}</td>
+                  {canSupply && (
+                    <td className="px-4 py-3 text-right">
+                      {t.type === "RECEIPT" && t.quantity > 0 && (reversedIds.has(t.id)
+                        ? <span className="text-xs text-gray-400">Estornado</span>
+                        : <ReverseButton transactionId={t.id}
+                            label={`${t.unit.name} · ${t.batch.product.name}${t.batch.batchNumber !== NO_LOT ? ` lote ${t.batch.batchNumber}` : " (sem lote)"} · +${t.quantity}`} />)}
+                    </td>
+                  )}
                 </tr>
               );
             })}
