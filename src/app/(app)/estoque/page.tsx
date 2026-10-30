@@ -3,9 +3,11 @@ import Link from "next/link";
 import { canSupplyStock, seesAllUnits } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe } from "lucide-react";
+import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 import SupplyForm from "./SupplyForm";
 import ReverseButton from "./ReverseButton";
+import AutoSubmitSelect from "./AutoSubmitSelect";
 import { NO_LOT, STANDARD_PRODUCTS } from "@/lib/products";
 import { canTraceBatches } from "@/lib/batch-trace";
 
@@ -13,13 +15,62 @@ const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00a
 
 const DEFAULT_MIN_STRAWS = 15;
 
-export default async function EstoquePage({ searchParams }: { searchParams: Promise<{ unidade?: string }> }) {
+// Movimentações por página (a pessoa escolhe; "todas" desliga a paginação)
+const PAGE_SIZES = ["10", "20", "50", "todas"];
+const DEFAULT_PAGE_SIZE = "20";
+
+const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
+  RECEIPT: { label: "Recebimento", cls: "text-green-600" },
+  CONSUMPTION: { label: "Consumo", cls: "text-red-600" },
+  DISCARD: { label: "Descarte", cls: "text-orange-600" },
+  ADJUSTMENT: { label: "Ajuste", cls: "text-blue-600" },
+  TRANSFER_IN: { label: "Transferência (entrada)", cls: "text-green-600" },
+  TRANSFER_OUT: { label: "Transferência (saída)", cls: "text-red-600" },
+};
+
+type Params = { unidade?: string; busca?: string; tipo?: string; mov_unidade?: string; pagina?: string; por_pagina?: string };
+
+export default async function EstoquePage({ searchParams }: { searchParams: Promise<Params> }) {
   const session = await getSession();
   if (!session) return null;
-  const { unidade } = await searchParams;
+  const params = await searchParams;
+  const { unidade } = params;
 
   const isAdmin = seesAllUnits(session.role);
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
+
+  // Movimentações: busca por produto, lote ou unidade, filtro por tipo/unidade e paginação
+  const busca = (params.busca ?? "").trim().slice(0, 80);
+  const tipo = params.tipo && params.tipo in TYPE_LABELS ? params.tipo : "";
+  const movUnit = params.mov_unidade ?? "";
+  const contains = { contains: busca, mode: "insensitive" as const };
+  const movWhere: Prisma.InventoryTransactionWhereInput = {
+    AND: [
+      unitFilter,
+      ...(tipo ? [{ type: tipo }] : []),
+      ...(movUnit ? [{ unitId: movUnit }] : []),
+      ...(busca ? [{ OR: [
+        { batch: { batchNumber: contains } },
+        { batch: { product: { name: contains } } },
+        { unit: { name: contains } },
+      ] }] : []),
+    ],
+  };
+  const movTotal = await prisma.inventoryTransaction.count({ where: movWhere });
+  const perPage = PAGE_SIZES.includes(params.por_pagina ?? "") ? params.por_pagina! : DEFAULT_PAGE_SIZE;
+  const pageSize = perPage === "todas" ? undefined : Number(perPage);
+  const pages = pageSize ? Math.max(1, Math.ceil(movTotal / pageSize)) : 1;
+  const page = Math.min(pages, Math.max(1, Number.parseInt(params.pagina ?? "1", 10) || 1));
+  const pageHref = (n: number) => {
+    const q = new URLSearchParams();
+    if (unidade) q.set("unidade", unidade);
+    if (busca) q.set("busca", busca);
+    if (tipo) q.set("tipo", tipo);
+    if (movUnit) q.set("mov_unidade", movUnit);
+    if (perPage !== DEFAULT_PAGE_SIZE) q.set("por_pagina", perPage);
+    if (n > 1) q.set("pagina", String(n));
+    return `/estoque?${q}#movimentacoes`;
+  };
 
   const grouped = await prisma.inventoryTransaction.groupBy({
     by: ["unitId", "batchId"],
@@ -39,13 +90,13 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     prisma.stockThreshold.findMany({ where: { unitId: { in: unitIds } }, select: { unitId: true, minimumStraws: true } }),
     prisma.alert.count({ where: { ...unitFilter, resolved: false, type: "LOW_STOCK" } }),
     prisma.inventoryTransaction.findMany({
-      where: unitFilter,
+      where: movWhere,
       include: {
         batch: { include: { product: { select: { name: true } } } },
         unit: { select: { name: true } },
       },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      ...(pageSize ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
     }),
   ]);
 
@@ -114,15 +165,6 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     .filter((u) => u.items.length > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
   const today = new Date();
-
-  const typeLabels: Record<string, { label: string; cls: string }> = {
-    RECEIPT: { label: "Recebimento", cls: "text-green-600" },
-    CONSUMPTION: { label: "Consumo", cls: "text-red-600" },
-    DISCARD: { label: "Descarte", cls: "text-orange-600" },
-    ADJUSTMENT: { label: "Ajuste", cls: "text-blue-600" },
-    TRANSFER_IN: { label: "Transferência (entrada)", cls: "text-green-600" },
-    TRANSFER_OUT: { label: "Transferência (saída)", cls: "text-red-600" },
-  };
 
   return (
     <div>
@@ -265,9 +307,41 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Movimentações Recentes */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Movimentações Recentes</h2>
+      <div id="movimentacoes" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-semibold text-gray-900">Movimentações</h2>
+            <p className="text-xs text-gray-400">
+              {movTotal} movimentaç{movTotal === 1 ? "ão" : "ões"}{busca || tipo || movUnit ? " encontrada" + (movTotal === 1 ? "" : "s") : ""}
+            </p>
+          </div>
+          <form action="/estoque#movimentacoes" className="flex flex-wrap gap-2">
+            {unidade && <input type="hidden" name="unidade" value={unidade} />}
+            <div className="relative flex-1 min-w-48">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input name="busca" defaultValue={busca} placeholder="Buscar produto, lote ou unidade" className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <select name="tipo" defaultValue={tipo} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+              <option value="">Todos os tipos</option>
+              {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            {units.length > 1 && (
+              <select name="mov_unidade" defaultValue={movUnit} className="px-3 py-2 border border-gray-300 rounded-lg text-sm max-w-56">
+                <option value="">Todas as unidades</option>
+                {[...units].sort((a, b) => a.name.localeCompare(b.name)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            )}
+            <label className="flex items-center gap-1.5 text-sm text-gray-500">
+              Mostrar
+              <AutoSubmitSelect name="por_pagina" defaultValue={perPage} className="px-2 py-2 border border-gray-300 rounded-lg text-sm text-gray-900">
+                {PAGE_SIZES.map((s) => <option key={s} value={s}>{s === "todas" ? "Todas" : s}</option>)}
+              </AutoSubmitSelect>
+            </label>
+            <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Filtrar</button>
+            {(busca || tipo || movUnit) && (
+              <Link href={unidade ? `/estoque?unidade=${unidade}#movimentacoes` : "/estoque#movimentacoes"} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">Limpar</Link>
+            )}
+          </form>
         </div>
         <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
@@ -283,8 +357,11 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
             </tr>
           </thead>
           <tbody>
+            {recentTransactions.length === 0 && (
+              <tr><td colSpan={canSupply ? 7 : 6} className="px-4 py-10 text-center text-sm text-gray-400">Nenhuma movimentação encontrada</td></tr>
+            )}
             {recentTransactions.map((t) => {
-              const tl = typeLabels[t.type] || { label: t.type, cls: "text-gray-600" };
+              const tl = TYPE_LABELS[t.type] || { label: t.type, cls: "text-gray-600" };
               return (
                 <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-500">{new Date(t.createdAt).toLocaleDateString("pt-BR")}</td>
@@ -311,6 +388,17 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           </tbody>
         </table>
         </div>
+        {pages > 1 && (
+          <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-3 border-t border-gray-100 text-sm">
+            {page > 1
+              ? <Link href={pageHref(page - 1)} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"><ChevronLeft size={15} /> Anteriores</Link>
+              : <span />}
+            <span className="text-gray-500">Página {page} de {pages}</span>
+            {page < pages
+              ? <Link href={pageHref(page + 1)} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">Próximas <ChevronRight size={15} /></Link>
+              : <span />}
+          </div>
+        )}
       </div>
     </div>
   );
