@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageUnits, seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { parseUnitInput } from "@/lib/units";
+import { DEFAULT_DOCUMENTS, parseUnitInput } from "@/lib/units";
 
 export async function GET() {
   const session = await getSession();
@@ -32,7 +32,13 @@ export async function POST(request: NextRequest) {
   }
 
   const unit = await prisma.$transaction(async (tx) => {
-    const created = await tx.unit.create({ data: { ...input, organizationId: session.organizationId } });
+    const created = await tx.unit.create({
+      data: {
+        ...input, organizationId: session.organizationId,
+        // Toda unidade começa com os documentos padrão (sem anexos)
+        documents: { create: DEFAULT_DOCUMENTS.map((d) => ({ ...d, updatedById: session.id })) },
+      },
+    });
     await tx.auditLog.create({
       data: { userId: session.id, action: "CREATE", entity: "Unit", entityId: created.id, details: JSON.stringify(input) },
     });

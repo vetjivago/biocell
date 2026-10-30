@@ -4,6 +4,7 @@
 //   anexos/prontuario-geral/<paciente>/<data> <tipo> - <arquivo>
 //   anexos/ordens-servico/<nº de série>/<arquivo>
 //   anexos/fotos-pacientes/<paciente>.<ext>
+//   anexos/documentos-unidades/<unidade>/<documento>/<arquivo>
 //   resumo.json                  (quantidade de registros e de anexos)
 // Uso: npx tsx prisma/backup.ts
 import { Prisma, PrismaClient } from "@prisma/client";
@@ -94,6 +95,20 @@ async function main() {
   }
   summary["fotos dos pacientes"] = photos.length;
   console.log(`Fotos dos pacientes: ${photos.length}`);
+
+  // 5. Documentos das unidades (Cartão CNPJ, contratos...)
+  const unitDocs = await prisma.unitDocumentAttachment.findMany({
+    select: { id: true, fileName: true, document: { select: { name: true, unit: { select: { name: true } } } } },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const a of unitDocs) {
+    const file = await prisma.unitDocumentAttachment.findUnique({ where: { id: a.id }, select: { data: true } });
+    const dir = join(root, "anexos", "documentos-unidades", safe(a.document.unit.name), safe(a.document.name));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(uniquePath(dir, safe(a.fileName)), file!.data);
+  }
+  summary["documentos das unidades"] = unitDocs.length;
+  console.log(`Documentos das unidades: ${unitDocs.length}`);
 
   writeFileSync(join(root, "resumo.json"), JSON.stringify({ geradoEm: new Date().toISOString(), ...summary }, null, 2));
   console.log(`Backup salvo em ${root}`);

@@ -23,16 +23,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const active = typeof body.active === "boolean" ? body.active : unit.active;
   const updated = await prisma.$transaction(async (tx) => {
-    const u = await tx.unit.update({ where: { id }, data: { ...input, active } });
+    // Data da desativação (como "Inativada em" no Sults); reativar limpa
+    const inactivatedAt = active ? null : unit.active ? new Date() : unit.inactivatedAt;
+    const u = await tx.unit.update({ where: { id }, data: { ...input, active, inactivatedAt } });
     await tx.auditLog.create({
       data: {
         userId: session.id, action: "UPDATE", entity: "Unit", entityId: id,
         details: JSON.stringify({
           changed: { ...input, active },
-          before: {
-            name: unit.name, city: unit.city, state: unit.state, address: unit.address, phone: unit.phone, species: unit.species,
-            generalRecordEnabled: unit.generalRecordEnabled, serviceOrderEnabled: unit.serviceOrderEnabled, active: unit.active,
-          },
+          before: Object.fromEntries(Object.keys({ ...input, active }).map((k) => [k, unit[k as keyof typeof unit]])),
         }),
       },
     });

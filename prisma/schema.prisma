@@ -19,60 +19,118 @@ model Organization {
 }
 
 model Unit {
-  id             String       @id @default(cuid())
-  name           String
-  city           String
-  state          String
-  address        String?
-  phone          String?
-  species        String
-  active         Boolean      @default(true)
-  // Prontuário clínico geral (habilitado por unidade; inicialmente só Águas Claras)
-  generalRecordEnabled Boolean @default(false)
-  // Ordem de serviço para o preparo das células (inicialmente só Águas Claras)
-  serviceOrderEnabled  Boolean @default(false)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime     @default(now())
+  id            String    @id @default(cuid())
+  name          String
+  city          String
+  state         String
+  // Endereço montado a partir dos campos abaixo (usado nas impressões de OS e orçamento)
+  address       String?
+  // Primeiro telefone/celular da lista (usado nas impressões)
+  phone         String?
+  species       String
+  active        Boolean   @default(true)
+  inactivatedAt DateTime?
 
-  users               UserUnit[]
-  patients             Patient[]
-  medicalRecords       MedicalRecord[]
+  // Dados cadastrais (faturamento e acompanhamento jurídico/fiscal)
+  cnpj                 String? // só dígitos
+  legalName            String? // razão social
+  tradeName            String? // nome fantasia
+  legalNature          String? // natureza jurídica (ex.: 206-2 - Sociedade Empresária Limitada)
+  legalCategory        String? // categoria jurídica (porte): ver LEGAL_CATEGORIES em src/lib/units.ts
+  stateRegistration    String? // inscrição estadual
+  shareCapital         Decimal?     @db.Decimal(15, 2)
+  zipCode              String? // CEP, só dígitos
+  street               String?
+  number               String?
+  complement           String?
+  district             String?
+  phones               String[]     @default([])
+  mobiles              String[]     @default([])
+  emails               String[]     @default([])
+  billingEmails        String[]     @default([]) // e-mails de faturamento (envio de NF/boletos)
+  financeEmails        String[]     @default([]) // e-mails do financeiro
+  // Prontuário clínico geral (habilitado por unidade; inicialmente só Águas Claras)
+  generalRecordEnabled Boolean      @default(false)
+  // Ordem de serviço para o preparo das células (inicialmente só Águas Claras)
+  serviceOrderEnabled  Boolean      @default(false)
+  organizationId       String
+  organization         Organization @relation(fields: [organizationId], references: [id])
+  createdAt            DateTime     @default(now())
+
+  users                 UserUnit[]
+  patients              Patient[]
+  medicalRecords        MedicalRecord[]
   inventoryTransactions InventoryTransaction[]
-  stockThresholds      StockThreshold[]
-  alerts               Alert[]
-  shipmentsSent        Shipment[]       @relation("ShipmentFrom")
-  shipmentsReceived    Shipment[]       @relation("ShipmentTo")
-  clinicalEntries      ClinicalEntry[]
-  serviceOrders        ServiceOrder[]
-  sales                Sale[]
+  stockThresholds       StockThreshold[]
+  alerts                Alert[]
+  shipmentsSent         Shipment[]             @relation("ShipmentFrom")
+  shipmentsReceived     Shipment[]             @relation("ShipmentTo")
+  clinicalEntries       ClinicalEntry[]
+  serviceOrders         ServiceOrder[]
+  sales                 Sale[]
+  documents             UnitDocument[]
 
   @@index([organizationId])
+}
+
+// Documentos da unidade (Cartão CNPJ, Contrato Social, Contrato UABC e outros), cada um com vários anexos
+model UnitDocument {
+  id          String    @id @default(cuid())
+  unitId      String
+  unit        Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  // CNPJ_CARD, SOCIAL_CONTRACT, UABC_CONTRACT (criados com a unidade) ou OTHER
+  kind        String    @default("OTHER")
+  name        String
+  notes       String?
+  dueDate     DateTime?
+  // PUBLIC: todos que veem a ficha da unidade; RESTRICTED: só matriz e administrativo
+  visibility  String    @default("PUBLIC")
+  updatedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  attachments UnitDocumentAttachment[]
+
+  @@index([unitId])
+}
+
+model UnitDocumentAttachment {
+  id           String       @id @default(cuid())
+  documentId   String
+  document     UnitDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileName     String
+  mimeType     String
+  size         Int
+  data         Bytes
+  uploadedById String
+  createdAt    DateTime     @default(now())
+
+  @@index([documentId])
 }
 
 // ── Usuários e Permissões ───────────────────────────────────────
 
 model User {
-  id             String       @id @default(cuid())
-  name           String
+  id                 String       @id @default(cuid())
+  name               String
   // Login por e-mail ou celular: pelo menos um dos dois
-  email          String?      @unique
+  email              String?      @unique
   // Celular só com dígitos, DDD + número (ex.: 61999998888)
-  phone          String?      @unique
-  passwordHash   String
-  role           String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  active         Boolean      @default(true)
+  phone              String?      @unique
+  passwordHash       String
+  role               String
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  active             Boolean      @default(true)
   // Senha provisória (criada/redefinida pela matriz ou gestor): obriga a trocar no próximo login
-  mustChangePassword Boolean  @default(false)
+  mustChangePassword Boolean      @default(false)
   // Excluído pela matriz/gestor: some das listas e não entra mais; o nome continua no histórico clínico
-  deletedAt      DateTime?
-  createdAt      DateTime     @default(now())
+  deletedAt          DateTime?
+  createdAt          DateTime     @default(now())
 
-  units          UserUnit[]
-  medicalRecords MedicalRecord[]
-  auditLogs      AuditLog[]
+  units           UserUnit[]
+  medicalRecords  MedicalRecord[]
+  auditLogs       AuditLog[]
   clinicalEntries ClinicalEntry[]
   serviceOrders   ServiceOrder[]
   salesCreated    Sale[]          @relation("SaleCreatedBy")
@@ -95,28 +153,28 @@ model UserUnit {
 // ── Pacientes (Animais) ─────────────────────────────────────────
 
 model Patient {
-  id              String   @id @default(cuid())
-  name            String
-  serialNumber    String?
-  species         String
-  breed           String?
-  weight          Float?
-  ownerName       String
-  ownerPhone      String?
-  ownerEmail      String?
-  veterinarian    String?
-  clinic          String?
-  sex             String?
-  neutered        Boolean  @default(false)
-  coat            String?
-  birthDate       DateTime?
-  microchip       String?
-  ownerAddress    String?
-  ownerCpf        String?
-  unitId          String
-  unit            Unit     @relation(fields: [unitId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String    @id @default(cuid())
+  name         String
+  serialNumber String?
+  species      String
+  breed        String?
+  weight       Float?
+  ownerName    String
+  ownerPhone   String?
+  ownerEmail   String?
+  veterinarian String?
+  clinic       String?
+  sex          String?
+  neutered     Boolean   @default(false)
+  coat         String?
+  birthDate    DateTime?
+  microchip    String?
+  ownerAddress String?
+  ownerCpf     String?
+  unitId       String
+  unit         Unit      @relation(fields: [unitId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   photo           PatientPhoto?
   medicalRecords  MedicalRecord[]
@@ -139,25 +197,25 @@ model PatientPhoto {
 // ── Prontuário Clínico Geral ────────────────────────────────────
 // Linha do tempo do paciente: atendimentos, anamnese, exames, peso, receitas...
 model ClinicalEntry {
-  id          String   @id @default(cuid())
-  patientId   String
-  patient     Patient  @relation(fields: [patientId], references: [id])
-  unitId      String
-  unit        Unit     @relation(fields: [unitId], references: [id])
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id])
-  type        String
-  title       String?
-  content     String   @default("")
-  weight      Float?
+  id         String    @id @default(cuid())
+  patientId  String
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  unitId     String
+  unit       Unit      @relation(fields: [unitId], references: [id])
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id])
+  type       String
+  title      String?
+  content    String    @default("")
+  weight     Float?
   // Tipo do atendimento (Aplicação CT, Retorno, C15...), retorno agendado, alta da internação, link de vídeo
-  subtype     String?
-  returnDate  DateTime?
-  endedAt     DateTime?
-  videoUrl    String?
-  occurredAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  subtype    String?
+  returnDate DateTime?
+  endedAt    DateTime?
+  videoUrl   String?
+  occurredAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   attachments ClinicalAttachment[]
 
@@ -182,34 +240,34 @@ model ClinicalAttachment {
 // ── Prontuário Eletrônico ───────────────────────────────────────
 
 model MedicalRecord {
-  id                String   @id @default(cuid())
-  serialNumber      String   @unique @default(cuid())
-  patientId         String
-  patient           Patient  @relation(fields: [patientId], references: [id])
-  unitId            String
-  unit              Unit     @relation(fields: [unitId], references: [id])
-  professionalId    String
-  professional      User     @relation(fields: [professionalId], references: [id])
+  id             String  @id @default(cuid())
+  serialNumber   String  @unique @default(cuid())
+  patientId      String
+  patient        Patient @relation(fields: [patientId], references: [id])
+  unitId         String
+  unit           Unit    @relation(fields: [unitId], references: [id])
+  professionalId String
+  professional   User    @relation(fields: [professionalId], references: [id])
 
-  pathology         String
-  cellQuantity      String?
-  applicationRoute  String?
-  donors            String?
-  serumCollected    Boolean  @default(false)
+  pathology        String
+  cellQuantity     String?
+  applicationRoute String?
+  donors           String?
+  serumCollected   Boolean @default(false)
 
-  status            String   @default("OPEN")
-  requestDate       DateTime @default(now())
-  completedAt       DateTime?
+  status      String    @default("OPEN")
+  requestDate DateTime  @default(now())
+  completedAt DateTime?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  applications      Application[]
-  thawings          Thawing[]
-  procedures        Procedure[]
-  inventoryTransactions InventoryTransaction[]
+  applications            Application[]
+  thawings                Thawing[]
+  procedures              Procedure[]
+  inventoryTransactions   InventoryTransaction[]
   serviceOrderApplication ServiceOrderApplication?
-  attachments       MedicalRecordAttachment[]
+  attachments             MedicalRecordAttachment[]
 
   @@index([patientId])
   @@index([unitId])
@@ -230,7 +288,7 @@ model Application {
   // Quem preparou as células desta aplicação
   preparedBy      String?
 
-  items           ApplicationItem[]
+  items ApplicationItem[]
 
   @@index([medicalRecordId])
 }
@@ -278,29 +336,29 @@ model Procedure {
 // ── Produtos Celulares e Lotes ──────────────────────────────────
 
 model CellProduct {
-  id          String      @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   code        String?
   description String?
   species     String?
-  category    String      @default("CELULAS")
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
+  category    String   @default("CELULAS")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  batches     CellBatch[]
+  batches CellBatch[]
 }
 
 model CellBatch {
-  id            String      @id @default(cuid())
-  batchNumber   String
-  productId     String
-  product       CellProduct @relation(fields: [productId], references: [id])
+  id                String      @id @default(cuid())
+  batchNumber       String
+  productId         String
+  product           CellProduct @relation(fields: [productId], references: [id])
   manufacturingDate DateTime?
   expirationDate    DateTime?
   totalStraws       Int
   storageConditions String?
-  notes         String?
-  createdAt     DateTime     @default(now())
+  notes             String?
+  createdAt         DateTime    @default(now())
 
   inventoryTransactions InventoryTransaction[]
   shipmentItems         ShipmentItem[]
@@ -312,11 +370,11 @@ model CellBatch {
 // ── Estoque (Ledger de Movimentações) ───────────────────────────
 
 model InventoryTransaction {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   unitId          String
-  unit            Unit          @relation(fields: [unitId], references: [id])
+  unit            Unit           @relation(fields: [unitId], references: [id])
   batchId         String
-  batch           CellBatch     @relation(fields: [batchId], references: [id])
+  batch           CellBatch      @relation(fields: [batchId], references: [id])
   type            String
   quantity        Int
   balance         Int
@@ -325,7 +383,7 @@ model InventoryTransaction {
   shipmentId      String?
   reason          String?
   performedBy     String?
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime       @default(now())
 
   @@index([unitId])
   @@index([batchId])
@@ -336,9 +394,9 @@ model InventoryTransaction {
 // ── Limites de Estoque e Alertas ────────────────────────────────
 
 model StockThreshold {
-  id            String @id @default(cuid())
+  id            String   @id @default(cuid())
   unitId        String
-  unit          Unit   @relation(fields: [unitId], references: [id])
+  unit          Unit     @relation(fields: [unitId], references: [id])
   productName   String
   minimumStraws Int
   createdAt     DateTime @default(now())
@@ -347,15 +405,15 @@ model StockThreshold {
 }
 
 model Alert {
-  id        String   @id @default(cuid())
-  unitId    String
-  unit      Unit     @relation(fields: [unitId], references: [id])
-  type      String
-  message   String
+  id             String   @id @default(cuid())
+  unitId         String
+  unit           Unit     @relation(fields: [unitId], references: [id])
+  type           String
+  message        String
   // Alerta "OS aberta" (type SERVICE_ORDER): leva à OS
   serviceOrderId String?
-  resolved  Boolean  @default(false)
-  createdAt DateTime @default(now())
+  resolved       Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   @@index([unitId])
   @@index([resolved])
@@ -364,30 +422,30 @@ model Alert {
 // ── Remessas (Matriz → Unidade) ─────────────────────────────────
 
 model Shipment {
-  id          String   @id @default(cuid())
-  fromUnitId  String
-  fromUnit    Unit     @relation("ShipmentFrom", fields: [fromUnitId], references: [id])
-  toUnitId    String
-  toUnit      Unit     @relation("ShipmentTo", fields: [toUnitId], references: [id])
-  status      String   @default("PENDING")
-  shippedAt   DateTime?
-  receivedAt  DateTime?
-  notes       String?
-  createdAt   DateTime @default(now())
+  id         String    @id @default(cuid())
+  fromUnitId String
+  fromUnit   Unit      @relation("ShipmentFrom", fields: [fromUnitId], references: [id])
+  toUnitId   String
+  toUnit     Unit      @relation("ShipmentTo", fields: [toUnitId], references: [id])
+  status     String    @default("PENDING")
+  shippedAt  DateTime?
+  receivedAt DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
 
-  items       ShipmentItem[]
+  items ShipmentItem[]
 
   @@index([fromUnitId])
   @@index([toUnitId])
 }
 
 model ShipmentItem {
-  id          String    @id @default(cuid())
-  shipmentId  String
-  shipment    Shipment  @relation(fields: [shipmentId], references: [id])
-  batchId     String
-  batch       CellBatch @relation(fields: [batchId], references: [id])
-  quantity    Int
+  id         String    @id @default(cuid())
+  shipmentId String
+  shipment   Shipment  @relation(fields: [shipmentId], references: [id])
+  batchId    String
+  batch      CellBatch @relation(fields: [batchId], references: [id])
+  quantity   Int
 
   @@index([shipmentId])
   @@index([batchId])
@@ -396,15 +454,15 @@ model ShipmentItem {
 // ── Auditoria ───────────────────────────────────────────────────
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  action     String
-  entity     String
-  entityId   String?
-  details    String?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([entity, entityId])
@@ -414,13 +472,13 @@ model AuditLog {
 // ── Contatos de Follow-up (C1 e C15 do verso do prontuário) ────
 
 model FollowUpContact {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   medicalRecordId String
   contactType     String
   date            DateTime?
   responsible     String?
   observations    String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   @@index([medicalRecordId])
 }
@@ -453,25 +511,25 @@ model ServiceOrder {
 }
 
 model ServiceOrderApplication {
-  id              String         @id @default(cuid())
-  serviceOrderId  String
-  serviceOrder    ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
-  number          Int
-  date            DateTime?
-  veterinarian    String?
-  financial       String?
-  technicalNotes  String?
+  id               String         @id @default(cuid())
+  serviceOrderId   String
+  serviceOrder     ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  number           Int
+  date             DateTime?
+  veterinarian     String?
+  financial        String?
+  technicalNotes   String?
   // Orientações para quem prepara as células
   applicationRoute String?
   cellQuantity     String?
   preparation      String?
-  status          String         @default("OPEN")
+  status           String         @default("OPEN")
   // Veterinário clínico concluiu o pedido e avisou o laboratório (alerta "OS aberta")
-  sentToLabAt     DateTime?
-  medicalRecordId String?        @unique
-  medicalRecord   MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  sentToLabAt      DateTime?
+  medicalRecordId  String?        @unique
+  medicalRecord    MedicalRecord? @relation(fields: [medicalRecordId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@unique([serviceOrderId, number])
 }

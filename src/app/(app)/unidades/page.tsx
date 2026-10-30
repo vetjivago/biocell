@@ -1,17 +1,20 @@
 import { prisma } from "@/lib/prisma";
-import { canManageUnits } from "@/lib/roles";
+import { canManageUnits, canViewUnitDetails, seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { MapPin, Phone, Plus } from "lucide-react";
+import { formatCnpj } from "@/lib/units";
 
 export default async function UnidadesPage() {
   const session = await getSession();
   if (!session) return null;
 
   const isAdmin = canManageUnits(session.role);
+  // Matriz e administrativo abrem a ficha para editar; o comercial só consulta
+  const canOpen = canViewUnitDetails(session.role);
   // Matriz vê também as desativadas (no fim da lista) para poder reativar
   const units = await prisma.unit.findMany({
-    where: isAdmin ? {} : { id: { in: session.unitIds }, active: true },
+    where: isAdmin ? {} : seesAllUnits(session.role) ? { active: true } : { id: { in: session.unitIds }, active: true },
     orderBy: [{ state: "asc" }, { name: "asc" }],
   });
   const active = units.filter((u) => u.active);
@@ -28,7 +31,7 @@ export default async function UnidadesPage() {
     const body = (
       <>
         <h3 className="font-semibold text-gray-900 text-sm mb-1">{u.name}</h3>
-        <p className="text-xs text-gray-500 mb-2">{u.city}/{u.state}</p>
+        <p className="text-xs text-gray-500 mb-2">{u.city}/{u.state}{u.cnpj ? ` · ${formatCnpj(u.cnpj)}` : ""}</p>
         <div className="flex flex-wrap gap-1 mb-3">
           {u.species.split(", ").map((s) => (
             <span key={s} className="bg-green-50 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-medium">
@@ -51,7 +54,7 @@ export default async function UnidadesPage() {
       </>
     );
     const cls = `block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${u.active ? "" : "opacity-60"}`;
-    return isAdmin
+    return canOpen
       ? <Link key={u.id} href={`/unidades/${u.id}`} className={cls}>{body}</Link>
       : <div key={u.id} className={cls}>{body}</div>;
   };

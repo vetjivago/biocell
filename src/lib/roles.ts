@@ -70,6 +70,11 @@ export function canManageUnits(role: string) {
   return hasRole(role, "ADMIN", "ADMINISTRATIVE");
 }
 
+// Ficha da unidade (dados cadastrais e documentos): o comercial só consulta
+export function canViewUnitDetails(role: string) {
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "COMMERCIAL");
+}
+
 // Abastecer o estoque das unidades
 export function canSupplyStock(role: string) {
   return hasRole(role, "ADMIN", "STOCK");
@@ -78,7 +83,7 @@ export function canSupplyStock(role: string) {
 // Perfis com telas limitadas: só podem abrir estas páginas e só alterar por estas APIs
 // (os demais seguem as regras de cada tela)
 const ROLE_PAGES: Partial<Record<Role, string[]>> = {
-  COMMERCIAL: ["/dashboard", "/relatorios", "/conta"],
+  COMMERCIAL: ["/dashboard", "/relatorios", "/unidades", "/conta"],
   ADMINISTRATIVE: ["/dashboard", "/unidades", "/usuarios", "/conta"],
 };
 const ROLE_WRITE_APIS: Partial<Record<Role, string[]>> = {
