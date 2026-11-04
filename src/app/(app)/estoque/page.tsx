@@ -8,10 +8,10 @@ import type { Prisma } from "@prisma/client";
 import SupplyForm from "./SupplyForm";
 import ReverseButton from "./ReverseButton";
 import AutoSubmitSelect from "./AutoSubmitSelect";
-import { NO_LOT, STANDARD_PRODUCTS } from "@/lib/products";
+import { CELL_PRODUCTS, NO_LOT, cellLabel } from "@/lib/products";
 import { canTraceBatches } from "@/lib/batch-trace";
 
-const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a" };
+const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a", Treino: "#64748b" };
 
 const DEFAULT_MIN_STRAWS = 15;
 
@@ -123,6 +123,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         unitId: g.unitId,
         unitName: unitMap[g.unitId] || "",
         batchId: g.batchId,
+        productId: batch?.productId || "",
         batchNumber: batch?.batchNumber || "",
         productName: batch?.product.name || "",
         category: batch?.product.category || "CELULAS",
@@ -155,8 +156,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         cells,
         min,
         low: cells <= min,
-        bySpecies: STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS")
-          .map((p) => ({ name: p.species!, value: total(items, (s) => s.category === "CELULAS" && s.species === p.species) })),
+        bySpecies: CELL_PRODUCTS.map((p) => ({ name: cellLabel(p), value: total(items, (s) => s.productId === p.id) })),
         meio: total(items, (s) => s.category === "MEIO"),
         soro: total(items, (s) => s.category === "SORO"),
         material: total(items, (s) => s.category === "MATERIAL"),
@@ -179,11 +179,11 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       </div>
 
       {/* Resumo: palhetas por espécie + insumos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-6">
         {[
-          ...STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS").map((p) => ({
-            key: p.id, label: p.name, unit: p.unit, icon: Package, color: SPECIES_COLOR[p.species!],
-            value: stock.filter((s) => s.category === "CELULAS" && s.species === p.species).reduce((sum, i) => sum + i.balance, 0),
+          ...CELL_PRODUCTS.map((p) => ({
+            key: p.id, label: p.name, unit: p.unit, icon: Package, color: SPECIES_COLOR[cellLabel(p)],
+            value: stock.filter((s) => s.productId === p.id).reduce((sum, i) => sum + i.balance, 0),
           })),
           { key: "meio", label: "MEIO", unit: "unidades", icon: Beaker, color: "#2563eb", value: stock.filter((s) => s.category === "MEIO").reduce((sum, i) => sum + i.balance, 0) },
           { key: "soro", label: "SORO", unit: "unidades", icon: Droplets, color: "#7c3aed", value: stock.filter((s) => s.category === "SORO").reduce((sum, i) => sum + i.balance, 0) },

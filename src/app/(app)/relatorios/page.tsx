@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { seesAllUnits } from "@/lib/roles";
-import { STANDARD_PRODUCTS } from "@/lib/products";
+import { CELL_PRODUCTS, cellLabel } from "@/lib/products";
 
 type Search = { de?: string; ate?: string; unidade?: string };
 
@@ -25,7 +25,9 @@ function presets() {
   ];
 }
 
-const SPECIES = STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS").map((p) => p.species!);
+// Uma coluna por produto de células (Canino, Felino, Equino, Treino)
+const SPECIES = CELL_PRODUCTS.map(cellLabel);
+const LABEL_OF: Record<string, string> = Object.fromEntries(CELL_PRODUCTS.map((p) => [p.id, cellLabel(p)]));
 const fmtDay = (d: string) => d.split("-").reverse().join("/");
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -62,16 +64,16 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const batchIds = [...new Set([...consumptionByUnitBatch, ...stockGroups].map((g) => g.batchId))];
   const batches = await prisma.cellBatch.findMany({
     where: { id: { in: batchIds } },
-    select: { id: true, product: { select: { category: true, species: true } } },
+    select: { id: true, productId: true, product: { select: { category: true, species: true } } },
   });
-  const productOf = Object.fromEntries(batches.map((b) => [b.id, b.product]));
+  const productOf = Object.fromEntries(batches.map((b) => [b.id, { ...b.product, label: LABEL_OF[b.productId] ?? b.product.species }]));
 
   // Consumo de palhetas: total, por espécie e por unidade
   const used = (g: { _sum: { quantity: number | null } }) => Math.abs(g._sum.quantity || 0);
   const totalStraws = consumptionByUnitBatch.reduce((s, g) => s + used(g), 0);
   const strawsBySpecies = SPECIES.map((sp) => ({
     species: sp,
-    value: consumptionByUnitBatch.filter((g) => productOf[g.batchId]?.species === sp).reduce((s, g) => s + used(g), 0),
+    value: consumptionByUnitBatch.filter((g) => productOf[g.batchId]?.label === sp).reduce((s, g) => s + used(g), 0),
   }));
 
   // Ranking das unidades: atendimentos e palhetas no período
@@ -101,7 +103,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
     const r = stockRows.get(g.unitId) ?? stockRows.set(g.unitId, { unitId: g.unitId, species: {}, meio: 0, soro: 0, material: 0, cells: 0 }).get(g.unitId)!;
     if (p.category === "CELULAS") {
       r.cells += qty;
-      if (p.species) r.species[p.species] = (r.species[p.species] ?? 0) + qty;
+      if (p.label) r.species[p.label] = (r.species[p.label] ?? 0) + qty;
     } else if (p.category === "MEIO") r.meio += qty;
     else if (p.category === "SORO") r.soro += qty;
     else r.material += qty;

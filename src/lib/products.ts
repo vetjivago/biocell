@@ -15,6 +15,9 @@ export const STANDARD_PRODUCTS: readonly Product[] = [
   { id: "prod_ctm_canino", name: "CTM CANINO", code: "CTM-CAN", category: "CELULAS", species: "Canino", unit: "palhetas", presentation: "Palheta congelada" },
   { id: "prod_ctm_felino", name: "CTM FELINO", code: "CTM-FEL", category: "CELULAS", species: "Felino", unit: "palhetas", presentation: "Palheta congelada" },
   { id: "prod_ctm_equino", name: "CTM EQUINO", code: "CTM-EQU", category: "CELULAS", species: "Equino", unit: "palhetas", presentation: "Palheta congelada" },
+  // Células de treino: entram no estoque e no prontuário (com lote), mas não vão para animal nem têm OS.
+  // Sem espécie, aparecem para qualquer paciente no prontuário.
+  { id: "prod_ctm_treino", name: "CTM TREINO", code: "CTM-TRE", category: "CELULAS", species: null, unit: "palhetas", presentation: "Palheta congelada" },
 
   { id: "prod_meio_descongelamento", name: "Meio de descongelamento", code: "MEIO-DESC", category: "MEIO", species: null, unit: "tubos", presentation: "Tubo 10 mL" },
   { id: "prod_meio_lavagem", name: "Meio de lavagem", code: "MEIO-LAV", category: "MEIO", species: null, unit: "tubos", presentation: "Tubo 15 mL" },
@@ -49,6 +52,14 @@ export const STANDARD_PRODUCTS: readonly Product[] = [
 
 export type ProductCategory = Product["category"];
 
+// Produtos de células atuais (CTM por espécie + treino), na ordem de exibição
+export const CELL_PRODUCTS = STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS" && !p.legacy);
+
+// Rótulo curto da célula nos resumos ("Canino", "Felino", "Equino", "Treino")
+export function cellLabel(p: { species: string | null }) {
+  return p.species ?? "Treino";
+}
+
 // Grupos usados no abastecimento, no prontuário e na baixa
 export const PRODUCT_CATEGORIES: { key: ProductCategory; label: string; unit: string }[] = [
   { key: "CELULAS", label: "Células", unit: "palhetas" },
@@ -74,6 +85,8 @@ export function standardProduct(id: unknown) {
 export function standardFor(category: string, species: string | null) {
   if (category === "SORO") return standardProduct("prod_soro");
   if (category === "MEIO") return standardProduct("prod_meio");
+  // Só por espécie: produto antigo sem espécie não vira TREINO automaticamente
+  if (!species) return null;
   return STANDARD_PRODUCTS.find((p) => p.category === "CELULAS" && p.species === species) ?? null;
 }
 
