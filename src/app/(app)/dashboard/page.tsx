@@ -48,8 +48,8 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
       by: ["pathology"],
       _count: true,
       where: unitFilter,
-      orderBy: { _count: { pathology: "desc" } },
-      take: 8,
+      // Todas as patologias (o card rola quando passam de ~8); empates em ordem alfabética
+      orderBy: [{ _count: { pathology: "desc" } }, { pathology: "asc" }],
     }),
   ]);
 
@@ -182,11 +182,16 @@ export default async function DashboardPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Patologias Tratadas</h2>
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">Patologias Tratadas</h2>
+            {data.pathologyStats.length > 0 && (
+              <span className="text-xs text-gray-400">{data.pathologyStats.length} patologias</span>
+            )}
+          </div>
           {data.pathologyStats.length === 0 ? (
             <p className="text-sm text-gray-400 py-8 text-center">Nenhuma patologia registrada</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-2">
               {data.pathologyStats.map((p, i) => (
                 <div key={p.pathology} className="flex items-center gap-3">
                   <span className="text-xs text-gray-400 w-5">{i + 1}</span>
