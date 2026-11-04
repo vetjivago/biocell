@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { OF_VISIBLE_PATIENT } from "@/lib/patient-search";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { checkApplications, parseApplications, parseThawings, summarize, validateLots } from "@/lib/record-applications";
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
   if (unitId && !isAdmin && !session.unitIds.includes(unitId)) return Response.json([], { status: 403 });
   const where = {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
+    ...OF_VISIBLE_PATIENT,
     ...(status ? { status } : {}),
     ...(unitId ? { unitId } : {}),
   };

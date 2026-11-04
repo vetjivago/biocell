@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { OF_VISIBLE_PATIENT, VISIBLE_PATIENT } from "@/lib/patient-search";
 import { seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import {
@@ -16,6 +17,8 @@ import { syncOpenLowStockAlerts } from "@/lib/stock-alerts";
 async function getDashboardData(session: { role: string; unitIds: string[] }) {
   const isAdmin = seesAllUnits(session.role);
   const unitFilter = isAdmin ? {} : { unitId: { in: session.unitIds } };
+  // Prontuários de pacientes ocultos pela matriz não entram nos totais
+  const recordFilter = { ...unitFilter, ...OF_VISIBLE_PATIENT };
   await syncOpenLowStockAlerts(isAdmin ? undefined : session.unitIds);
 
   const [
@@ -29,12 +32,12 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     pathologyStats,
   ] = await Promise.all([
     prisma.unit.count({ where: { active: true } }),
-    prisma.patient.count({ where: unitFilter }),
-    prisma.medicalRecord.count({ where: unitFilter }),
-    prisma.medicalRecord.count({ where: { ...unitFilter, status: "OPEN" } }),
+    prisma.patient.count({ where: { ...unitFilter, ...VISIBLE_PATIENT } }),
+    prisma.medicalRecord.count({ where: recordFilter }),
+    prisma.medicalRecord.count({ where: { ...recordFilter, status: "OPEN" } }),
     prisma.alert.count({ where: { ...unitFilter, resolved: false, type: "LOW_STOCK" } }),
     prisma.medicalRecord.findMany({
-      where: unitFilter,
+      where: recordFilter,
       include: { patient: true, unit: true, professional: true },
       orderBy: { createdAt: "desc" },
       take: 5,
@@ -47,7 +50,7 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     prisma.medicalRecord.groupBy({
       by: ["pathology"],
       _count: true,
-      where: unitFilter,
+      where: recordFilter,
       // Todas as patologias (o card rola quando passam de ~8); empates em ordem alfabética
       orderBy: [{ _count: { pathology: "desc" } }, { pathology: "asc" }],
     }),

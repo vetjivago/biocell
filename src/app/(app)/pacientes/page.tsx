@@ -1,20 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
-import { Plus, Search, FilePlus } from "lucide-react";
+import { Plus, Search, FilePlus, EyeOff } from "lucide-react";
+import { hasRole } from "@/lib/roles";
 import { SEARCH_FIELDS, parseSearchField, patientSearchWhere } from "@/lib/patient-search";
 
 export default async function PacientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; campo?: string }>;
+  searchParams: Promise<{ q?: string; campo?: string; ocultos?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { q: rawQ, campo } = await searchParams;
+  const { q: rawQ, campo, ocultos } = await searchParams;
   const q = rawQ?.trim();
   const field = parseSearchField(campo);
-  const where = patientSearchWhere(session, q, field);
+  // Só a matriz vê os pacientes ocultos (para consultar ou restaurar)
+  const isMatriz = hasRole(session.role, "ADMIN");
+  const showHidden = isMatriz && ocultos === "1";
+  const where = patientSearchWhere(session, q, field, showHidden);
 
   const patients = await prisma.patient.findMany({
     where,
@@ -27,8 +31,18 @@ export default async function PacientesPage({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pacientes</h1>
-          <p className="text-sm text-gray-500 mt-1">{patients.length} pacientes encontrados</p>
+          <h1 className="text-2xl font-bold text-gray-900">{showHidden ? "Pacientes ocultos" : "Pacientes"}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {patients.length} {showHidden ? "ocultos" : "pacientes encontrados"}
+            {isMatriz && (
+              <>
+                {" · "}
+                <Link href={showHidden ? "/pacientes" : "/pacientes?ocultos=1"} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  {showHidden ? "Voltar aos pacientes" : <><EyeOff size={13} /> Ver ocultos</>}
+                </Link>
+              </>
+            )}
+          </p>
         </div>
         <Link
           href="/pacientes/novo"
@@ -40,6 +54,7 @@ export default async function PacientesPage({
       </div>
 
       <form className="mb-6 flex flex-col sm:flex-row gap-2">
+        {showHidden && <input type="hidden" name="ocultos" value="1" />}
         <select
           name="campo"
           defaultValue={field}
@@ -94,12 +109,18 @@ export default async function PacientesPage({
                 <td className="px-4 py-3 text-sm text-gray-600">{p._count.medicalRecords}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{p.weight ? `${p.weight} kg` : "–"}</td>
                 <td className="px-4 py-3 text-right">
+                  {showHidden ? (
+                    <span className="text-xs text-gray-400">
+                      Oculto em {p.archivedAt ? new Date(p.archivedAt).toLocaleDateString("pt-BR") : "–"}
+                    </span>
+                  ) : (
                   <Link
                     href={`/prontuarios/novo?patientId=${p.id}`}
                     className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline whitespace-nowrap"
                   >
                     <FilePlus size={14} /> Novo prontuário
                   </Link>
+                  )}
                 </td>
               </tr>
             ))}

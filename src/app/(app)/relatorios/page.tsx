@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { OF_VISIBLE_PATIENT } from "@/lib/patient-search";
 import { getSession } from "@/lib/auth";
 import { seesAllUnits } from "@/lib/roles";
 import { CELL_PRODUCTS, cellLabel } from "@/lib/products";
@@ -48,15 +49,17 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const de = sp.de && DAY.test(sp.de) ? sp.de : "";
   const ate = sp.ate && DAY.test(sp.ate) ? sp.ate : "";
   const period = de || ate ? { createdAt: { ...(de ? { gte: startOf(de) } : {}), ...(ate ? { lte: endOf(ate) } : {}) } } : {};
+  // Prontuários de pacientes ocultos pela matriz não entram (o consumo de palhetas sim: o estoque é real)
+  const recordWhere = { ...unitFilter, ...period, ...OF_VISIBLE_PATIENT };
   const cellsConsumption = { ...unitFilter, ...period, type: "CONSUMPTION", batch: { product: { category: "CELULAS" } } };
 
   const [records, completed, patients, consumptionByUnitBatch, recordsByUnit, pathologies, stockGroups] = await Promise.all([
-    prisma.medicalRecord.count({ where: { ...unitFilter, ...period } }),
-    prisma.medicalRecord.count({ where: { ...unitFilter, ...period, status: "COMPLETED" } }),
-    prisma.medicalRecord.findMany({ where: { ...unitFilter, ...period }, select: { patientId: true }, distinct: ["patientId"] }),
+    prisma.medicalRecord.count({ where: recordWhere }),
+    prisma.medicalRecord.count({ where: { ...recordWhere, status: "COMPLETED" } }),
+    prisma.medicalRecord.findMany({ where: recordWhere, select: { patientId: true }, distinct: ["patientId"] }),
     prisma.inventoryTransaction.groupBy({ by: ["unitId", "batchId"], _sum: { quantity: true }, where: cellsConsumption }),
-    prisma.medicalRecord.groupBy({ by: ["unitId"], _count: true, where: { ...unitFilter, ...period } }),
-    prisma.medicalRecord.groupBy({ by: ["pathology"], _count: true, where: { ...unitFilter, ...period } }),
+    prisma.medicalRecord.groupBy({ by: ["unitId"], _count: true, where: recordWhere }),
+    prisma.medicalRecord.groupBy({ by: ["pathology"], _count: true, where: recordWhere }),
     // Estoque é o saldo atual (não depende do período)
     prisma.inventoryTransaction.groupBy({ by: ["unitId", "batchId"], _sum: { quantity: true }, where: unitFilter }),
   ]);

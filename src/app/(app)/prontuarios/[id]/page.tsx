@@ -44,7 +44,8 @@ export default async function ProntuarioDetailPage({
   });
 
   if (!record) notFound();
-  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(record.unitId)) notFound();
+  // Abre quem é da unidade do atendimento ou da unidade atual do paciente (se a matriz o mudou de UABC)
+  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(record.unitId) && !session.unitIds.includes(record.patient.unitId)) notFound();
   const canEdit = canEditRecord(session, record);
   const deletable = record.status !== "COMPLETED" && record.inventoryTransactions.length === 0;
 

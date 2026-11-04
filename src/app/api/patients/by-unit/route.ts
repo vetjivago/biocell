@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { VISIBLE_PATIENT } from "@/lib/patient-search";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
 import { hasRole } from "@/lib/roles";
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   const patients = await prisma.patient.findMany({
-    where: { unitId },
+    where: { unitId, ...VISIBLE_PATIENT },
     select: { id: true, name: true, species: true, breed: true, ownerName: true },
     orderBy: { name: "asc" },
   });

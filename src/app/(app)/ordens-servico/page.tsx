@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { OF_VISIBLE_PATIENT } from "@/lib/patient-search";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { ORDER_STATUS, orderStatus, serviceOrderUnitIds } from "@/lib/service-orders";
@@ -23,7 +24,7 @@ export default async function OrdensServicoPage({
 
   const unitIds = await serviceOrderUnitIds(session);
   const orders = unitIds.length === 0 ? [] : await prisma.serviceOrder.findMany({
-    where: { unitId: { in: unitIds } },
+    where: { unitId: { in: unitIds }, ...OF_VISIBLE_PATIENT },
     include: {
       patient: { select: { id: true, name: true, species: true, ownerName: true } },
       unit: { select: { name: true } },

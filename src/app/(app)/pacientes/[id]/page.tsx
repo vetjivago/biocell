@@ -14,6 +14,7 @@ import { htmlToText } from "@/lib/rich-text";
 import PrintButton from "./geral/PrintButton";
 import PhotoUpload from "./PhotoUpload";
 import { hasRole } from "@/lib/roles";
+import PatientAdminMenu from "./PatientAdminMenu";
 
 const ENTRY_ICONS: Record<EntryType, typeof Stethoscope> = {
   ATENDIMENTO: Stethoscope,
@@ -73,7 +74,31 @@ export default async function PacienteDetailPage({
   });
 
   if (!patient) notFound();
-  if (!hasRole(session.role, "ADMIN") && !session.unitIds.includes(patient.unitId)) notFound();
+  const isMatriz = hasRole(session.role, "ADMIN");
+  if (!isMatriz && !session.unitIds.includes(patient.unitId)) notFound();
+  // Paciente oculto pela matriz: só a matriz abre a ficha
+  if (!isMatriz && patient.archivedAt) notFound();
+
+  // Ações da matriz: destino para mover e o tamanho do histórico (para avisar antes de apagar)
+  const admin = isMatriz
+    ? await Promise.all([
+        prisma.unit.findMany({ where: { active: true }, select: { id: true, name: true, state: true }, orderBy: [{ state: "asc" }, { name: "asc" }] }),
+        prisma.patient.findUnique({ where: { id }, select: { _count: { select: { sales: true, clinicalEntries: true } } } }),
+        prisma.inventoryTransaction.aggregate({
+          where: { medicalRecord: { patientId: id }, batch: { product: { category: "CELULAS" } } },
+          _sum: { quantity: true },
+        }),
+      ]).then(([units, extra, straws]) => ({
+        units,
+        counts: {
+          records: patient.medicalRecords.length,
+          orders: patient.serviceOrders.length,
+          sales: extra?._count.sales ?? 0,
+          entries: extra?._count.clinicalEntries ?? 0,
+          straws: Math.max(0, -(straws._sum.quantity ?? 0)),
+        },
+      }))
+    : null;
 
   const generalEnabled = patient.unit.generalRecordEnabled;
   const tab = !generalEnabled || aba === "ct" ? "ct" : aba === "financeiro" ? "financeiro" : "geral";
@@ -170,7 +195,17 @@ export default async function PacienteDetailPage({
         <Link href="/pacientes" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft size={16} /> Voltar
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {admin && (
+            <PatientAdminMenu
+              patientId={patient.id}
+              patientName={patient.name}
+              archived={!!patient.archivedAt}
+              unitId={patient.unitId}
+              units={admin.units}
+              counts={admin.counts}
+            />
+          )}
           <Link href={`${base}/editar`} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-700 hover:bg-gray-50">
             <Pencil size={14} /> Editar cadastro
           </Link>
@@ -179,6 +214,13 @@ export default async function PacienteDetailPage({
           </Link>
         </div>
       </div>
+
+      {patient.archivedAt && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
+          Paciente oculto em {new Date(patient.archivedAt).toLocaleDateString("pt-BR", { timeZone: TZ })}: não aparece em listas, buscas nem totais.
+          Para voltar a exibir, use <strong>Matriz → Restaurar</strong>.
+        </div>
+      )}
 
       {/* Cabeçalho: tutor à esquerda, animal à direita (como no SimplesVet) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 print:shadow-none print:border-0 print:p-0">

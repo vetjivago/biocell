@@ -18,12 +18,18 @@ export function parseSearchField(campo: string | null | undefined): SearchField 
   return campo && campo in SEARCH_FIELDS ? (campo as SearchField) : "all";
 }
 
-// Filtro de pacientes respeitando as unidades do usuário
-export function patientSearchWhere(session: SessionUser, rawQ: string | null | undefined, field: SearchField) {
+// Pacientes ocultos pela matriz ficam fora de listas, buscas e totais (o histórico continua no banco)
+export const VISIBLE_PATIENT = { archivedAt: null };
+// Para prontuários, OS e vendas: só os de pacientes visíveis
+export const OF_VISIBLE_PATIENT = { patient: VISIBLE_PATIENT };
+
+// Filtro de pacientes respeitando as unidades do usuário; a matriz pode listar só os ocultos
+export function patientSearchWhere(session: SessionUser, rawQ: string | null | undefined, field: SearchField, archived = false) {
   const q = rawQ?.trim();
   const isAdmin = hasRole(session.role, "ADMIN");
   return {
     ...(isAdmin ? {} : { unitId: { in: session.unitIds } }),
+    archivedAt: archived && isAdmin ? { not: null } : null,
     ...(q
       ? field === "all"
         ? { OR: TEXT_FIELDS.map((f) => ({ [f]: { contains: q, mode: "insensitive" as const } })) }
