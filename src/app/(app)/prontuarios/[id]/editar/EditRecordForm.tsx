@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { describeMismatch, thawMismatches } from "@/lib/thaw-check";
 import { PATHOLOGIES } from "@/lib/pathologies";
 import { normalizeSpecies } from "@/lib/species";
 import { PRODUCT_CATEGORIES, lotLabel, type ProductCategory } from "@/lib/products";
@@ -58,6 +59,9 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
     return lot.balance - used;
   };
 
+  // Descongelamento × aplicação de mesmo número: palhetas, meio e soro precisam bater
+  const mismatches = thawMismatches(form.applications, form.thawings);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const pathology = pathologyChoice === OTHER ? form.pathology.trim() : pathologyChoice;
@@ -74,6 +78,7 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
       }
       if (!a.preparedBy.trim()) return setError(`${a.number}ª aplicação: informe o responsável pelo preparo`);
     }
+    if (mismatches.length > 0) return setError(`Descongelamento diferente da aplicação: ${describeMismatch(mismatches[0])}`);
     setSaving(true);
     setError("");
     const res = await fetch(`/api/medical-records/${initial.id}`, {
@@ -229,6 +234,15 @@ export default function EditRecordForm({ initial, stock }: { initial: EditRecord
           )}
         </div>
         {form.thawings.length === 0 && <p className="text-sm text-gray-400">Nenhum descongelamento registrado.</p>}
+        {mismatches.length > 0 && (
+            <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium flex items-center gap-1.5"><AlertTriangle size={15} /> Quantidades não batem com a aplicação</p>
+              <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                {mismatches.map((m) => <li key={`${m.number}-${m.label}`}>{describeMismatch(m)}</li>)}
+              </ul>
+              <p className="mt-1 text-xs text-amber-800">Corrija a aplicação ou o descongelamento para poder salvar.</p>
+            </div>
+          )}
         {form.thawings.map((t, ti) => {
           const upd = (k: keyof Thaw, v: string) => setThaws((list) => list.map((x, j) => (j === ti ? { ...x, [k]: v } : x)));
           return (

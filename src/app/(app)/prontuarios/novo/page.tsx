@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Camera, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Camera, Plus, Trash2, X } from "lucide-react";
+import { describeMismatch, thawMismatches } from "@/lib/thaw-check";
 import Link from "next/link";
 import { normalizeSpecies } from "@/lib/species";
 import { PATHOLOGIES } from "@/lib/pathologies";
@@ -210,6 +211,9 @@ function NovoProntuarioForm() {
     setThawings((ts) => ts.map((t, j) => j === i ? { ...t, [field]: value } : t));
   }
 
+  // Descongelamento × aplicação de mesmo número: palhetas, meio e soro precisam bater
+  const mismatches = thawMismatches(applications, thawings);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -228,6 +232,7 @@ function NovoProntuarioForm() {
       }
       if (!a.preparedBy?.trim()) return fail(`${a.number}ª aplicação: informe o responsável pelo preparo`);
     }
+    if (mismatches.length > 0) return fail(`Descongelamento diferente da aplicação: ${describeMismatch(mismatches[0])}`);
     if (photos.length === 0) return fail("Anexe a foto das palhetas");
 
     const newApps = applications
@@ -631,6 +636,15 @@ function NovoProntuarioForm() {
 
           {readonlyThaws.length > 0 && (
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Novo descongelamento</p>
+          )}
+          {mismatches.length > 0 && (
+            <div role="alert" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-medium flex items-center gap-1.5"><AlertTriangle size={15} /> Quantidades não batem com a aplicação</p>
+              <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                {mismatches.map((m) => <li key={`${m.number}-${m.label}`}>{describeMismatch(m)}</li>)}
+              </ul>
+              <p className="mt-1 text-xs text-amber-800">Corrija a aplicação ou o descongelamento para poder salvar.</p>
+            </div>
           )}
           {editableThaws.map((thaw) => {
             const idx = thawings.indexOf(thaw);
