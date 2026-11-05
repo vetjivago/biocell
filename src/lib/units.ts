@@ -86,6 +86,8 @@ export function composeAddress(a: { street?: string | null; number?: string | nu
 
 export interface UnitInput {
   name: string;
+  // Data de início da unidade (exibida como "Criada em"); ausente = mantém a atual (ou hoje, ao criar)
+  createdAt?: Date;
   city: string;
   state: string;
   address: string | null;
@@ -144,6 +146,8 @@ export function parseUnitInput(body: Record<string, unknown>): UnitInput | { err
   if (legalCategory && !(LEGAL_CATEGORIES as readonly string[]).includes(legalCategory)) return { error: "Categoria jurídica inválida" };
   const shareCapital = parseMoney(body.shareCapital);
   if (Number.isNaN(shareCapital)) return { error: "Capital social inválido" };
+  const createdAt = parseStartDate(body.startDate);
+  if (createdAt === "invalid") return { error: "Data de início inválida (não pode ser no futuro)" };
 
   const phones = list(body.phones, 40, formatPhoneInput);
   const mobiles = list(body.mobiles, 40, formatPhoneInput);
@@ -164,6 +168,7 @@ export function parseUnitInput(body: Record<string, unknown>): UnitInput | { err
 
   return {
     name, city, state,
+    ...(createdAt ? { createdAt } : {}),
     // Sem os campos novos preenchidos, mantém o endereço antigo (texto livre)
     address: composeAddress(address) ?? (text(body.address, 250) || null),
     phone: phones[0] ?? mobiles[0] ?? null,
@@ -180,4 +185,18 @@ export function parseUnitInput(body: Record<string, unknown>): UnitInput | { err
     ...address,
     phones, mobiles, emails, billingEmails, financeEmails,
   };
+}
+
+// Data de início ("AAAA-MM-DD" do campo de data). Meio-dia de Brasília, para não virar o dia anterior em nenhum fuso
+export function parseStartDate(v: unknown): Date | null | "invalid" {
+  if (typeof v !== "string" || !v.trim()) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return "invalid";
+  const d = new Date(`${v.trim()}T12:00:00-03:00`);
+  if (Number.isNaN(d.getTime()) || d.getUTCFullYear() < 1990 || d.getTime() > Date.now() + 86_400_000) return "invalid";
+  return d;
+}
+
+// Data para o campo de data ("AAAA-MM-DD"), no dia de Brasília
+export function toDateInput(d: Date) {
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }

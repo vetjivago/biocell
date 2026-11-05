@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import UnitForm from "../UnitForm";
+import { toDateInput } from "@/lib/units";
 
 export default async function NovaUnidadePage() {
   const session = await getSession();
@@ -18,7 +19,7 @@ export default async function NovaUnidadePage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova UABC</h1>
       <UnitForm
         initial={{
-          name: "UABC ", city: "", state: "", address: "", species: ["Canino", "Felino"], generalRecordEnabled: false, serviceOrderEnabled: false, active: true,
+          name: "UABC ", city: "", state: "", address: "", species: ["Canino", "Felino"], generalRecordEnabled: false, serviceOrderEnabled: false, active: true, startDate: toDateInput(new Date()),
           cnpj: "", legalName: "", tradeName: "", legalNature: "", legalCategory: "", stateRegistration: "", shareCapital: "",
           zipCode: "", street: "", number: "", complement: "", district: "",
           phones: [], mobiles: [], emails: [], billingEmails: [], financeEmails: [],

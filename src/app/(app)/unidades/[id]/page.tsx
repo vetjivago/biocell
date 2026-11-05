@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, UserPlus } from "lucide-react";
 import { normalizeSpecies } from "@/lib/species";
-import { formatCep, formatCnpj } from "@/lib/units";
+import { formatCep, formatCnpj, toDateInput } from "@/lib/units";
 import { canSeeDocument } from "@/lib/unit-documents";
 import UnitForm from "../UnitForm";
 import UnitDocuments from "./UnitDocuments";
@@ -86,6 +86,7 @@ export default async function EditarUnidadePage({ params }: { params: Promise<{ 
           id: unit.id, name: unit.name, city: unit.city, state: unit.state, address: unit.address ?? "",
           species: [...new Set(unit.species.split(",").map((s) => normalizeSpecies(s)).filter((s) => s !== null))],
           generalRecordEnabled: unit.generalRecordEnabled, serviceOrderEnabled: unit.serviceOrderEnabled, active: unit.active,
+          startDate: toDateInput(unit.createdAt),
           cnpj: unit.cnpj ?? "", legalName: unit.legalName ?? "", tradeName: unit.tradeName ?? "",
           legalNature: unit.legalNature ?? "", legalCategory: unit.legalCategory ?? "", stateRegistration: unit.stateRegistration ?? "",
           shareCapital: unit.shareCapital ? unit.shareCapital.toFixed(2).replace(".", ",") : "",

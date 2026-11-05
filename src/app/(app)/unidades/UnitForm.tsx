@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, MapPin, Phone, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { SPECIES } from "@/lib/species";
-import { formatCep, formatCnpj, formatPhoneInput, isValidCnpj, LEGAL_CATEGORIES, onlyDigits, STATES } from "@/lib/units";
+import { formatCep, formatCnpj, formatPhoneInput, isValidCnpj, LEGAL_CATEGORIES, onlyDigits, STATES, toDateInput } from "@/lib/units";
 
 export interface UnitFormData {
   id?: string;
@@ -18,6 +18,8 @@ export interface UnitFormData {
   generalRecordEnabled: boolean;
   serviceOrderEnabled: boolean;
   active: boolean;
+  // Data de início da unidade ("AAAA-MM-DD"), exibida como "Criada em"
+  startDate: string;
   cnpj: string;
   legalName: string;
   tradeName: string;
@@ -48,6 +50,7 @@ export default function UnitForm({ initial, readOnly = false }: { initial: UnitF
   const router = useRouter();
   const isEdit = !!initial.id;
   const [form, setForm] = useState(initial);
+  const today = toDateInput(new Date());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -158,6 +161,11 @@ export default function UnitForm({ initial, readOnly = false }: { initial: UnitF
             <div>
               <label className={label}>Nome da unidade *</label>
               <input required value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="UABC NOME DA CLÍNICA" className={`${input} uppercase`} />
+            </div>
+            <div>
+              <label className={label}>Data de início</label>
+              <input type="date" value={form.startDate} max={today} onChange={(e) => set("startDate", e.target.value)} className={`${input} sm:w-48`} />
+              <p className="text-xs text-gray-400 mt-1">Quando a unidade começou a funcionar. Aparece como &quot;Criada em&quot;.</p>
             </div>
             <div>
               <label className={label}>CNPJ</label>
