@@ -55,3 +55,12 @@ export function nextSerial(lastSerials: string[], now = new Date()) {
 
 // Sugestões de via de aplicação (pode digitar outra)
 export const ROUTE_OPTIONS = ["Intravenosa (IV)", "Intra-articular", "Subcutânea", "Intramuscular", "Intralesional", "Intratecal", "Tópica / colírio"];
+
+// Via de aplicação e quantidade de células são obrigatórias na OS (orientação para quem prepara)
+export function prepMissing(v: { applicationRoute?: unknown; cellQuantity?: unknown }): string | null {
+  const blank = (x: unknown) => typeof x !== "string" || !x.trim();
+  if (blank(v.applicationRoute) && blank(v.cellQuantity)) return "Informe a via de aplicação e a quantidade de células";
+  if (blank(v.applicationRoute)) return "Informe a via de aplicação";
+  if (blank(v.cellQuantity)) return "Informe a quantidade de células";
+  return null;
+}

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Paperclip, Pencil, FlaskConical, FilePlus, Trash2, Send, CheckCircle } from "lucide-react";
-import { CHECKLIST_TERMS, ROUTE_OPTIONS, type ChecklistKey } from "@/lib/service-order-types";
+import { CHECKLIST_TERMS, ROUTE_OPTIONS, prepMissing, type ChecklistKey } from "@/lib/service-order-types";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/clinical-types";
 
 const input = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm";
@@ -76,6 +76,8 @@ export function ApplicationActions({
           <button type="button" onClick={() => setEditing(false)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">Cancelar</button>
           <button type="button" disabled={busy}
             onClick={() => run(async () => {
+              const missing = prepMissing(form);
+              if (missing) throw new Error(missing);
               await send(`/api/service-order-applications/${app.id}`, "PATCH", {
                 date: form.date || null, veterinarian: form.veterinarian, financial: form.financial, technicalNotes: form.technicalNotes,
                 applicationRoute: form.applicationRoute, cellQuantity: form.cellQuantity, preparation: form.preparation,
@@ -150,11 +152,11 @@ function PrepInputs({
     <div className="sm:col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
       <p className="sm:col-span-2 text-xs font-semibold text-amber-900">Para quem prepara as células</p>
       <div>
-        <label className={label}>Via de aplicação</label>
-        <input list="os-routes-edit" value={values.applicationRoute} onChange={set("applicationRoute")} className={input} />
+        <label className={label}>Via de aplicação *</label>
+        <input required list="os-routes-edit" value={values.applicationRoute} onChange={set("applicationRoute")} className={input} />
         <datalist id="os-routes-edit">{ROUTE_OPTIONS.map((r) => <option key={r} value={r} />)}</datalist>
       </div>
-      <div><label className={label}>Quantidade de células</label><input value={values.cellQuantity} onChange={set("cellQuantity")} className={input} /></div>
+      <div><label className={label}>Quantidade de células *</label><input required value={values.cellQuantity} onChange={set("cellQuantity")} className={input} /></div>
       <div className="sm:col-span-2"><label className={label}>Forma de preparo</label><textarea value={values.preparation} onChange={set("preparation")} rows={3} className={input} /></div>
     </div>
   );
@@ -198,6 +200,8 @@ export function AddApplication({
         <button type="button" onClick={() => setOpen(false)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">Cancelar</button>
         <button type="button" disabled={busy}
           onClick={async () => {
+            const missing = prepMissing(form);
+            if (missing) return setError(missing);
             setBusy(true);
             setError("");
             try {

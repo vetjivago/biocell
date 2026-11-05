@@ -105,13 +105,13 @@ export default function NewOrderForm({
           <div className="sm:col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <p className="sm:col-span-2 text-sm font-semibold text-amber-900">Para quem prepara as células</p>
             <div>
-              <label className={label}>Via de aplicação</label>
-              <input list="os-routes" value={form.applicationRoute} onChange={set("applicationRoute")} className={input} placeholder="Ex: Intravenosa (IV)" />
+              <label className={label}>Via de aplicação *</label>
+              <input required list="os-routes" value={form.applicationRoute} onChange={set("applicationRoute")} className={input} placeholder="Ex: Intravenosa (IV)" />
               <datalist id="os-routes">{ROUTE_OPTIONS.map((r) => <option key={r} value={r} />)}</datalist>
             </div>
             <div>
-              <label className={label}>Quantidade de células</label>
-              <input value={form.cellQuantity} onChange={set("cellQuantity")} className={input} placeholder="Ex: 2 palhetas (10 milhões)" />
+              <label className={label}>Quantidade de células *</label>
+              <input required value={form.cellQuantity} onChange={set("cellQuantity")} className={input} placeholder="Ex: 2 palhetas (10 milhões)" />
             </div>
             <div className="sm:col-span-2">
               <label className={label}>Forma de preparo</label>

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { nextSerial, optDate, optText } from "@/lib/service-orders";
+import { nextSerial, optDate, optText, prepMissing } from "@/lib/service-orders";
 import { hasRole } from "@/lib/roles";
 
 // Sugestão do próximo nº de série
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
   }
 
   const app = body.application || {};
+  const missing = prepMissing(app);
+  if (missing) return Response.json({ error: missing }, { status: 400 });
   const date = optDate(app.date);
   if (date === "invalid") return Response.json({ error: "Data da aplicação inválida" }, { status: 400 });
 

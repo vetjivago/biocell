@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { canSendToLab, getAccessibleOrder, optDate, optText, resolveOrderAlerts } from "@/lib/service-orders";
+import { canSendToLab, getAccessibleOrder, optDate, optText, prepMissing, resolveOrderAlerts } from "@/lib/service-orders";
 
 // Contexto da aplicação para o formulário de prontuário
 export async function GET(
@@ -54,6 +54,11 @@ export async function PATCH(
   if (body.applicationRoute !== undefined) data.applicationRoute = optText(body.applicationRoute, 200);
   if (body.cellQuantity !== undefined) data.cellQuantity = optText(body.cellQuantity, 100);
   if (body.preparation !== undefined) data.preparation = optText(body.preparation);
+  // Via e quantidade não podem ficar em branco (nem ser apagadas numa edição)
+  if (body.applicationRoute !== undefined || body.cellQuantity !== undefined) {
+    const missing = prepMissing({ applicationRoute: body.applicationRoute ?? app.applicationRoute, cellQuantity: body.cellQuantity ?? app.cellQuantity });
+    if (missing) return Response.json({ error: missing }, { status: 400 });
+  }
   if (body.status !== undefined) {
     if (app.status === "DONE") return Response.json({ error: "Aplicação já concluída (prontuário preenchido)" }, { status: 400 });
     if (body.status !== "OPEN" && body.status !== "IN_PREP") return Response.json({ error: "Status inválido" }, { status: 400 });
@@ -67,6 +72,9 @@ export async function PATCH(
     if (access.order.cancelled) return Response.json({ error: "OS cancelada" }, { status: 400 });
     if (app.status !== "OPEN") return Response.json({ error: "O laboratório já está com esta aplicação" }, { status: 400 });
     if (app.sentToLabAt) return Response.json({ error: "Esta OS já foi concluída e enviada ao laboratório" }, { status: 400 });
+    // OS antigas, abertas antes da regra: só vão ao laboratório com via e quantidade preenchidas
+    const missing = prepMissing(app);
+    if (missing) return Response.json({ error: `${missing} (use "Editar") antes de concluir a OS` }, { status: 400 });
     data.sentToLabAt = new Date();
   }
 

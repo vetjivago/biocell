@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { getAccessibleOrder, optDate, optText } from "@/lib/service-orders";
+import { getAccessibleOrder, optDate, optText, prepMissing } from "@/lib/service-orders";
 
 // Acrescenta a próxima aplicação (2ª, 3ª...) na mesma OS
 export async function POST(
@@ -16,6 +16,8 @@ export async function POST(
   if (access.order.cancelled) return Response.json({ error: "OS cancelada" }, { status: 400 });
 
   const body = await request.json();
+  const missing = prepMissing(body);
+  if (missing) return Response.json({ error: missing }, { status: 400 });
   const date = optDate(body.date);
   if (date === "invalid") return Response.json({ error: "Data inválida" }, { status: 400 });
 
