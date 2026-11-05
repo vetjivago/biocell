@@ -624,3 +624,9 @@ model SaleItem {
   @@index([saleId])
   @@index([description])
 }
+
+// ── Ajustes de dados feitos uma única vez (rodam no build: prisma/build-migrations.ts) ──
+model AppMigration {
+  name  String   @id
+  ranAt DateTime @default(now())
+}
