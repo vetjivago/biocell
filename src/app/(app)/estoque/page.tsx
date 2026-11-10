@@ -285,7 +285,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                           </td>
                           <td className="px-4 py-2.5 text-sm font-mono text-gray-600">
                             {s.batchNumber === NO_LOT ? "–" : canTrace
-                              ? <Link href={`/rastreabilidade/${s.batchId}`} className="hover:text-primary hover:underline" title="Rastrear lote">{s.batchNumber}</Link>
+                              ? <Link href={`/rastreabilidade/${s.batchId}?de=estoque&unidade=${encodeURIComponent(u.id)}`} className="hover:text-primary hover:underline" title="Rastrear lote">{s.batchNumber}</Link>
                               : s.batchNumber}
                           </td>
                           <td className={`px-4 py-2.5 text-sm ${expired ? "text-red-600 font-medium" : "text-gray-600"}`}>

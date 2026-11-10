@@ -25,7 +25,10 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const day = (d: Date | null | undefined) => (d ? new Date(d).toLocaleDateString("pt-BR") : "–");
 
-export default async function LoteTracePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LoteTracePage({ params, searchParams }: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ de?: string; unidade?: string }>;
+}) {
   const session = await getSession();
   if (!session) return null;
   if (!canTraceBatches(session.role)) notFound();
@@ -37,6 +40,12 @@ export default async function LoteTracePage({ params }: { params: Promise<{ id: 
   const unitLabel = batch.product.category === "CELULAS" ? "palhetas" : "un.";
   const expired = !!batch.expirationDate && batch.expirationDate < new Date();
 
+  // Quem abriu o lote pelo estoque de uma UABC volta para lá (com a unidade aberta)
+  const origem = await searchParams;
+  const fromStock = origem.de === "estoque";
+  const backUnit = typeof origem.unidade === "string" && /^[\w-]{1,64}$/.test(origem.unidade) ? origem.unidade : "";
+  const backHref = fromStock ? (backUnit ? `/estoque?unidade=${backUnit}#${backUnit}` : "/estoque") : "/rastreabilidade";
+
   const csvRows = uses.map((r) => [
     r.patient.name, r.patient.species, r.patient.breed ?? "", r.patient.ownerName,
     formatPhone(normalizePhone(r.patient.ownerPhone)) || r.patient.ownerPhone || "", r.patient.ownerEmail ?? "",
@@ -46,9 +55,16 @@ export default async function LoteTracePage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="max-w-6xl">
-      <Link href="/rastreabilidade" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary mb-4 print:hidden">
-        <ArrowLeft size={16} /> Consultar outro lote
-      </Link>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 print:hidden">
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-primary">
+          <ArrowLeft size={16} /> {fromStock ? "Voltar ao estoque" : "Consultar outro lote"}
+        </Link>
+        {fromStock && (
+          <Link href="/rastreabilidade" className="text-sm text-gray-400 hover:text-primary hover:underline">
+            Consultar outro lote
+          </Link>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
