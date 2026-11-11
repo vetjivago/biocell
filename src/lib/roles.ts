@@ -80,6 +80,12 @@ export function canSupplyStock(role: string) {
   return hasRole(role, "ADMIN", "STOCK");
 }
 
+// Dar baixa por perda (palheta estourada/quebrada, com foto): matriz e logística em qualquer unidade;
+// gestor e laboratório, nas suas
+export function canRegisterLoss(role: string) {
+  return hasRole(role, "ADMIN", "STOCK", "UNIT_MANAGER", "LAB");
+}
+
 // Perfis com telas limitadas: só podem abrir estas páginas e só alterar por estas APIs
 // (os demais seguem as regras de cada tela)
 const ROLE_PAGES: Partial<Record<Role, string[]>> = {

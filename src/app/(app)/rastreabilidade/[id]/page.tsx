@@ -11,6 +11,7 @@ const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
   RECEIPT: { label: "Recebimento", cls: "text-green-600" },
   CONSUMPTION: { label: "Uso em prontuário", cls: "text-red-600" },
   DISCARD: { label: "Descarte", cls: "text-orange-600" },
+  LOSS: { label: "Perda / quebra", cls: "text-orange-600" },
   ADJUSTMENT: { label: "Ajuste", cls: "text-blue-600" },
   TRANSFER_IN: { label: "Transferência (entrada)", cls: "text-green-600" },
   TRANSFER_OUT: { label: "Transferência (saída)", cls: "text-red-600" },

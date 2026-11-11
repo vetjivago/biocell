@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { canSupplyStock, seesAllUnits } from "@/lib/roles";
+import { canRegisterLoss, canSupplyStock, seesAllUnits } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Package, AlertTriangle, Beaker, Droplets, ChevronDown, Building2, Syringe, Search, ChevronLeft, ChevronRight, Camera } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import SupplyForm from "./SupplyForm";
 import ReverseButton from "./ReverseButton";
+import LossButton from "./LossButton";
 import AutoSubmitSelect from "./AutoSubmitSelect";
 import { CELL_PRODUCTS, NO_LOT, cellLabel } from "@/lib/products";
 import { canTraceBatches } from "@/lib/batch-trace";
@@ -23,6 +24,7 @@ const TYPE_LABELS: Record<string, { label: string; cls: string }> = {
   RECEIPT: { label: "Recebimento", cls: "text-green-600" },
   CONSUMPTION: { label: "Consumo", cls: "text-red-600" },
   DISCARD: { label: "Descarte", cls: "text-orange-600" },
+  LOSS: { label: "Perda / quebra", cls: "text-orange-600" },
   ADJUSTMENT: { label: "Ajuste", cls: "text-blue-600" },
   TRANSFER_IN: { label: "Transferência (entrada)", cls: "text-green-600" },
   TRANSFER_OUT: { label: "Transferência (saída)", cls: "text-red-600" },
@@ -94,6 +96,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       include: {
         batch: { include: { product: { select: { name: true } } } },
         unit: { select: { name: true } },
+        lossPhotos: { select: { id: true }, orderBy: { createdAt: "asc" } },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...(pageSize ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
@@ -102,6 +105,8 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
 
   // Recebimentos já estornados não mostram o botão de novo
   const canSupply = canSupplyStock(session.role);
+  // Baixa por perda (palheta estourada/quebrada, com foto): quem não é da matriz só vê as suas unidades
+  const canLoss = canRegisterLoss(session.role);
   const canTrace = canTraceBatches(session.role);
   const reversedIds = new Set(
     canSupply
@@ -266,6 +271,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                       <th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Lote</th>
                       <th className="text-left text-xs font-medium text-gray-500 px-4 py-2">Validade</th>
                       <th className="text-right text-xs font-medium text-gray-500 px-4 py-2">Saldo</th>
+                      {canLoss && <th className="px-4 py-2" />}
                     </tr>
                   </thead>
                   <tbody>
@@ -294,11 +300,19 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                           <td className="px-4 py-2.5 text-sm font-bold text-right text-gray-900">
                             {s.balance} <span className="text-xs font-normal text-gray-400">{s.category === "CELULAS" ? "palhetas" : "un."}</span>
                           </td>
+                          {canLoss && (
+                            <td className="px-4 py-2.5 text-right">
+                              <LossButton unitId={u.id} unitName={u.name} batchId={s.batchId} productName={s.productName}
+                                batchLabel={s.batchNumber === NO_LOT ? null : s.batchNumber} balance={s.balance}
+                                unitLabel={s.category === "CELULAS" ? "palhetas" : "un."} />
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                {canLoss && <p className="px-4 py-2 text-xs text-gray-400">Palheta estourou ou quebrou? Use o botão Dar baixa no lote e anexe a foto.</p>}
                 {u.low && <p className="px-4 py-2 text-xs text-red-600 bg-red-50">Abaixo do mínimo da unidade ({u.min} palhetas).</p>}
               </div>
             </details>
@@ -353,12 +367,12 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
               <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Produto / Lote</th>
               <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Qtd</th>
               <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Saldo</th>
-              {canSupply && <th className="px-4 py-3" />}
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {recentTransactions.length === 0 && (
-              <tr><td colSpan={canSupply ? 7 : 6} className="px-4 py-10 text-center text-sm text-gray-400">Nenhuma movimentação encontrada</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">Nenhuma movimentação encontrada</td></tr>
             )}
             {recentTransactions.map((t) => {
               const tl = TYPE_LABELS[t.type] || { label: t.type, cls: "text-gray-600" };
@@ -369,19 +383,26 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                   <td className="px-4 py-3 text-sm text-gray-600">{t.unit.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {t.batch.product.name} {t.batch.batchNumber !== NO_LOT && <span className="text-gray-400 font-mono">{t.batch.batchNumber}</span>}
+                    {t.type === "LOSS" && (
+                      <p className="text-xs text-gray-400 max-w-80 truncate" title={t.reason ?? ""}>{t.reason}{t.performedBy ? ` · ${t.performedBy}` : ""}</p>
+                    )}
                   </td>
                   <td className={`px-4 py-3 text-sm font-bold text-right ${t.quantity > 0 ? "text-green-600" : "text-red-600"}`}>
                     {t.quantity > 0 ? `+${t.quantity}` : t.quantity}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-600">{t.balance}</td>
-                  {canSupply && (
-                    <td className="px-4 py-3 text-right">
-                      {t.type === "RECEIPT" && t.quantity > 0 && (reversedIds.has(t.id)
+                  <td className="px-4 py-3 text-right">
+                      {t.lossPhotos.map((ph, i) => (
+                        <a key={ph.id} href={`/api/inventory/loss-photos/${ph.id}`} target="_blank" rel="noopener"
+                          className="inline-flex items-center gap-1 ml-1 px-2 py-1 border border-gray-200 text-gray-600 rounded-lg text-xs hover:bg-gray-50">
+                          <Camera size={12} /> Foto{t.lossPhotos.length > 1 ? ` ${i + 1}` : ""}
+                        </a>
+                      ))}
+                      {canSupply && t.type === "RECEIPT" && t.quantity > 0 && (reversedIds.has(t.id)
                         ? <span className="text-xs text-gray-400">Estornado</span>
                         : <ReverseButton transactionId={t.id}
                             label={`${t.unit.name} · ${t.batch.product.name}${t.batch.batchNumber !== NO_LOT ? ` lote ${t.batch.batchNumber}` : " (sem lote)"} · +${t.quantity}`} />)}
-                    </td>
-                  )}
+                  </td>
                 </tr>
               );
             })}

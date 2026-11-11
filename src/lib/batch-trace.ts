@@ -16,7 +16,7 @@ export function canSeeTracePatients(role: string) {
   return hasRole(role, "ADMIN", "UNIT_MANAGER");
 }
 
-const OUT_TYPES = ["DISCARD", "ADJUSTMENT", "TRANSFER_OUT"];
+const OUT_TYPES = ["DISCARD", "LOSS", "ADJUSTMENT", "TRANSFER_OUT"];
 
 export async function traceBatch(batchId: string, session: Session) {
   const allUnits = seesAllUnits(session.role);

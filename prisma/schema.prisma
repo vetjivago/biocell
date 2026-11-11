@@ -387,10 +387,27 @@ model InventoryTransaction {
   performedBy     String?
   createdAt       DateTime       @default(now())
 
+  lossPhotos InventoryLossPhoto[]
+
   @@index([unitId])
   @@index([batchId])
   @@index([medicalRecordId])
   @@index([type])
+}
+
+// Foto da palheta (ou insumo) quebrada, anexada na baixa por perda (type LOSS)
+model InventoryLossPhoto {
+  id            String               @id @default(cuid())
+  transactionId String
+  transaction   InventoryTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  fileName      String
+  mimeType      String
+  size          Int
+  data          Bytes
+  uploadedById  String
+  createdAt     DateTime             @default(now())
+
+  @@index([transactionId])
 }
 
 // ── Limites de Estoque e Alertas ────────────────────────────────
