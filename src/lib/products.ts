@@ -55,6 +55,13 @@ export type ProductCategory = Product["category"];
 // Produtos de células atuais (CTM por espécie + treino), na ordem de exibição
 export const CELL_PRODUCTS = STANDARD_PRODUCTS.filter((p) => p.category === "CELULAS" && !p.legacy);
 
+// Palhetas de treino: aparecem no estoque da unidade, mas não somam no total de células
+// nem contam para o alerta de estoque baixo (que é só das células comerciais)
+export const TRAINING_PRODUCT_ID = "prod_ctm_treino";
+export const isTraining = (productId: string | null | undefined) => productId === TRAINING_PRODUCT_ID;
+// Filtro Prisma de lote de células comerciais (CTM por espécie, sem o treino)
+export const COMMERCIAL_CELLS_BATCH = { product: { category: "CELULAS", id: { not: TRAINING_PRODUCT_ID } } };
+
 // Rótulo curto da célula nos resumos ("Canino", "Felino", "Equino", "Treino")
 export function cellLabel(p: { species: string | null }) {
   return p.species ?? "Treino";

@@ -9,7 +9,7 @@ import SupplyForm from "./SupplyForm";
 import ReverseButton from "./ReverseButton";
 import LossButton from "./LossButton";
 import AutoSubmitSelect from "./AutoSubmitSelect";
-import { CELL_PRODUCTS, NO_LOT, cellLabel } from "@/lib/products";
+import { CELL_PRODUCTS, NO_LOT, cellLabel, isTraining } from "@/lib/products";
 import { canTraceBatches } from "@/lib/batch-trace";
 
 const SPECIES_COLOR: Record<string, string> = { Canino: "#005847", Felino: "#00af6b", Equino: "#b5832a", Treino: "#64748b" };
@@ -153,15 +153,18 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           || (SPECIES_ORDER[a.species ?? ""] ?? 9) - (SPECIES_ORDER[b.species ?? ""] ?? 9)
           || a.productName.localeCompare(b.productName)
           || (a.expirationDate?.getTime() ?? Infinity) - (b.expirationDate?.getTime() ?? Infinity));
-      const cells = total(items, (s) => s.category === "CELULAS");
+      // Total e alerta só com células comerciais; o treino aparece à parte
+      const cells = total(items, (s) => s.category === "CELULAS" && !isTraining(s.productId));
+      const training = total(items, (s) => isTraining(s.productId));
       const min = minStraws[u.id] ?? DEFAULT_MIN_STRAWS;
       return {
         ...u,
         items,
         cells,
+        training,
         min,
         low: cells <= min,
-        bySpecies: CELL_PRODUCTS.map((p) => ({ name: cellLabel(p), value: total(items, (s) => s.productId === p.id) })),
+        bySpecies: CELL_PRODUCTS.filter((p) => !isTraining(p.id)).map((p) => ({ name: cellLabel(p), value: total(items, (s) => s.productId === p.id) })),
         meio: total(items, (s) => s.category === "MEIO"),
         soro: total(items, (s) => s.category === "SORO"),
         material: total(items, (s) => s.category === "MATERIAL"),
@@ -208,7 +211,8 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
         ))}
       </div>
       <p className="text-xs text-gray-400 -mt-4 mb-6">
-        Total de células-tronco: {stock.filter((s) => s.category === "CELULAS").reduce((sum, i) => sum + i.balance, 0)} palhetas
+        Total de células-tronco: {stock.filter((s) => s.category === "CELULAS" && !isTraining(s.productId)).reduce((sum, i) => sum + i.balance, 0)} palhetas
+        {" "}(palhetas de treino não entram no total)
       </p>
 
       {/* Estoque por unidade: um bloco por unidade; clicando abre os lotes */}
@@ -238,13 +242,18 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <div className={`rounded-lg p-3 ${u.low ? "bg-red-50" : "bg-green-50"}`}>
-                    <p className="text-xs text-gray-600 flex items-center gap-1"><Package size={13} /> Palhetas</p>
+                    <p className="text-xs text-gray-600 flex items-center gap-1"><Package size={13} /> Palhetas comerciais</p>
                     <p className={`text-2xl sm:text-3xl font-bold ${u.low ? "text-red-600" : "text-gray-900"}`}>{u.cells}</p>
                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
                       {u.bySpecies.filter((sp) => sp.value > 0).map((sp) => (
                         <span key={sp.name} className="text-xs font-medium" style={{ color: SPECIES_COLOR[sp.name] }}>{sp.name} {sp.value}</span>
                       ))}
                     </div>
+                    {u.training > 0 && (
+                      <p className="text-xs mt-1 pt-1 border-t border-black/5" style={{ color: SPECIES_COLOR.Treino }} title="Palhetas de treino não entram no total nem no alerta de estoque baixo">
+                        + Treino {u.training} <span className="text-gray-400">(fora do total)</span>
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-lg p-3 bg-blue-50">
                     <p className="text-xs text-gray-600 flex items-center gap-1"><Beaker size={13} /> Meio</p>

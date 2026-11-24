@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { COMMERCIAL_CELLS_BATCH } from "@/lib/products";
 import { OF_VISIBLE_PATIENT, VISIBLE_PATIENT } from "@/lib/patient-search";
 import { seesAllUnits } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
@@ -45,7 +46,7 @@ async function getDashboardData(session: { role: string; unitIds: string[] }) {
     prisma.inventoryTransaction.groupBy({
       by: ["unitId"],
       _sum: { quantity: true },
-      where: { ...unitFilter, batch: { product: { category: "CELULAS" } } },
+      where: { ...unitFilter, batch: COMMERCIAL_CELLS_BATCH }, // treino fora do total
     }),
     prisma.medicalRecord.groupBy({
       by: ["pathology"],

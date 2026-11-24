@@ -1,13 +1,14 @@
 import { prisma } from "./prisma";
+import { COMMERCIAL_CELLS_BATCH } from "./products";
 
 const DEFAULT_MIN_STRAWS = 15;
 
-// Recalcula o alerta de estoque baixo (células) a partir do saldo real da unidade:
+// Recalcula o alerta de estoque baixo (só células comerciais; palhetas de treino não contam) a partir do saldo real da unidade:
 // abre se estiver no mínimo ou abaixo, atualiza a mensagem com o saldo atual e resolve quando repõe
 export async function syncLowStockAlert(unitId: string) {
   const [total, threshold, open] = await Promise.all([
     prisma.inventoryTransaction.aggregate({
-      where: { unitId, batch: { product: { category: "CELULAS" } } },
+      where: { unitId, batch: COMMERCIAL_CELLS_BATCH },
       _sum: { quantity: true },
     }),
     prisma.stockThreshold.findFirst({ where: { unitId } }),

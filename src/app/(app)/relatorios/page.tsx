@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { OF_VISIBLE_PATIENT } from "@/lib/patient-search";
 import { getSession } from "@/lib/auth";
 import { seesAllUnits } from "@/lib/roles";
-import { CELL_PRODUCTS, cellLabel } from "@/lib/products";
+import { CELL_PRODUCTS, cellLabel, isTraining } from "@/lib/products";
 
 type Search = { de?: string; ate?: string; unidade?: string };
 
@@ -67,7 +67,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const batchIds = [...new Set([...consumptionByUnitBatch, ...stockGroups].map((g) => g.batchId))];
   const batches = await prisma.cellBatch.findMany({
     where: { id: { in: batchIds } },
-    select: { id: true, productId: true, product: { select: { category: true, species: true } } },
+    select: { id: true, productId: true, product: { select: { id: true, category: true, species: true } } },
   });
   const productOf = Object.fromEntries(batches.map((b) => [b.id, { ...b.product, label: LABEL_OF[b.productId] ?? b.product.species }]));
 
@@ -105,7 +105,8 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
     if (!qty || !p) continue;
     const r = stockRows.get(g.unitId) ?? stockRows.set(g.unitId, { unitId: g.unitId, species: {}, meio: 0, soro: 0, material: 0, cells: 0 }).get(g.unitId)!;
     if (p.category === "CELULAS") {
-      r.cells += qty;
+      // Treino aparece na coluna própria, mas não soma no total de células
+      if (!isTraining(p.id)) r.cells += qty;
       if (p.label) r.species[p.label] = (r.species[p.label] ?? 0) + qty;
     } else if (p.category === "MEIO") r.meio += qty;
     else if (p.category === "SORO") r.soro += qty;
@@ -259,7 +260,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
                 <tr className="border-b border-gray-100 text-left">
                   <th className={th}>Unidade</th>
                   {SPECIES.map((s) => <th key={s} className={`${th} text-right`}>CTM {s}</th>)}
-                  <th className={`${th} text-right`}>Total palhetas</th>
+                  <th className={`${th} text-right`} title="Só células comerciais: o treino não entra">Total palhetas (sem treino)</th>
                   <th className={`${th} text-right`}>Meio</th>
                   <th className={`${th} text-right`}>Soro</th>
                   <th className={`${th} text-right`}>Materiais</th>
