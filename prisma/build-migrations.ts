@@ -47,6 +47,54 @@ async function main() {
     )`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "InventoryLossPhoto_transactionId_idx" ON "InventoryLossPhoto"("transactionId")`);
 
+  // Nov/2026: pedidos de compra das UABCs (no lugar da loja do Sults)
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PurchaseOrder" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "number" SERIAL NOT NULL,
+      "unitId" TEXT NOT NULL REFERENCES "Unit"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      "createdById" TEXT NOT NULL,
+      "createdByName" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'WAITING',
+      "racksCanine" INTEGER NOT NULL DEFAULT 0,
+      "racksFeline" INTEGER NOT NULL DEFAULT 0,
+      "racksEquine" INTEGER NOT NULL DEFAULT 0,
+      "notes" TEXT,
+      "dryIce" BOOLEAN NOT NULL DEFAULT false,
+      "dryIceQty" INTEGER NOT NULL DEFAULT 0,
+      "shippingMode" TEXT,
+      "carrier" TEXT,
+      "freight" INTEGER NOT NULL DEFAULT 0,
+      "extraValue" INTEGER NOT NULL DEFAULT 0,
+      "discount" INTEGER NOT NULL DEFAULT 0,
+      "paymentMethod" TEXT,
+      "installments" TEXT,
+      "adminNotes" TEXT,
+      "invoicedAt" TIMESTAMP(3),
+      "shippedAt" TIMESTAMP(3),
+      "shippedBy" TEXT,
+      "deliveredAt" TIMESTAMP(3),
+      "cancelledAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PurchaseOrder_number_key" ON "PurchaseOrder"("number")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PurchaseOrder_unitId_idx" ON "PurchaseOrder"("unitId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PurchaseOrder_status_idx" ON "PurchaseOrder"("status")`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PurchaseOrderItem" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "orderId" TEXT NOT NULL REFERENCES "PurchaseOrder"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      "productId" TEXT NOT NULL,
+      "position" INTEGER NOT NULL,
+      "stockQty" INTEGER NOT NULL DEFAULT 0,
+      "calculated" INTEGER NOT NULL DEFAULT 0,
+      "extra" INTEGER NOT NULL DEFAULT 0,
+      "quantity" INTEGER NOT NULL DEFAULT 0,
+      "lots" JSONB
+    )`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PurchaseOrderItem_orderId_idx" ON "PurchaseOrderItem"("orderId")`);
+
   // Nov/2026: abertura de OS liberada para os veterinários clínicos de todas as UABCs
   await once("2026-11-os-todas-unidades", async () => {
     const r = await prisma.unit.updateMany({ where: { serviceOrderEnabled: false }, data: { serviceOrderEnabled: true } });

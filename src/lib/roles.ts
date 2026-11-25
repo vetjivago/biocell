@@ -2,12 +2,12 @@
 export const ROLES = {
   ADMIN: { label: "Matriz (administrador)", description: "Acesso total: todas as unidades, prontuários, estoque, relatórios e acessos." },
   ADMINISTRATIVE: { label: "Administrativo", description: "Abre novas UABCs e cadastra usuários." },
-  COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard, relatórios e usuários de todas as unidades, sem alterar nada." },
+  COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard, relatórios, pedidos e usuários de todas as unidades, sem alterar nada." },
   UNIT_MANAGER: { label: "Gestor da unidade", description: "Tudo da(s) sua(s) unidade(s), inclusive criar acessos da equipe." },
   PROFESSIONAL: { label: "Veterinário clínico", description: "Pacientes, prontuários e abertura de Ordens de Serviço." },
   LAB: { label: "Laboratório / preparo", description: "Fila de Ordens de Serviço, preparo das células e prontuário CT." },
   PROFESSIONAL_LAB: { label: "Veterinário clínico + Laboratório", description: "Atende e também prepara as células." },
-  STOCK: { label: "Logística (estoque)", description: "Abastece o estoque das unidades e acompanha as movimentações." },
+  STOCK: { label: "Logística (estoque)", description: "Abastece o estoque das unidades, atende os pedidos de compra e acompanha as movimentações." },
 } as const;
 
 export type Role = keyof typeof ROLES;
@@ -94,7 +94,7 @@ export function canRegisterLoss(role: string) {
 // Perfis com telas limitadas: só podem abrir estas páginas e só alterar por estas APIs
 // (os demais seguem as regras de cada tela)
 const ROLE_PAGES: Partial<Record<Role, string[]>> = {
-  COMMERCIAL: ["/dashboard", "/relatorios", "/unidades", "/usuarios", "/conta"],
+  COMMERCIAL: ["/dashboard", "/relatorios", "/unidades", "/usuarios", "/pedidos", "/conta"],
   ADMINISTRATIVE: ["/dashboard", "/unidades", "/usuarios", "/conta"],
 };
 const ROLE_WRITE_APIS: Partial<Record<Role, string[]>> = {
