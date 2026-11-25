@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
   { href: "/precos", label: "Tabela de preços", icon: Tag, roles: ["ADMIN"] as Role[] },
   { href: "/alertas", label: "Alertas", icon: AlertTriangle, roles: null },
-  { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER"] as Role[] },
+  { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "ADMINISTRATIVE", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
 ];
 
 export default function Sidebar({ userName, userRole, hasServiceOrders = false, openOrders = 0 }: { userName: string; userRole: string; hasServiceOrders?: boolean; openOrders?: number }) {
