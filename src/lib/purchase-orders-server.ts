@@ -22,7 +22,7 @@ export function canSeeUnit(session: SessionUser, unitId: string) {
 
 export async function getAccessiblePurchaseOrder(session: SessionUser, id: string) {
   if (!canViewPurchases(session.role)) return { error: "Sem permissão", status: 403 } as const;
-  const order = await prisma.purchaseOrder.findUnique({ where: { id }, include: { items: { orderBy: { position: "asc" } } } });
+  const order = await prisma.purchaseOrder.findUnique({ where: { id }, include: { items: { orderBy: { position: "asc" } }, lines: { orderBy: { position: "asc" } } } });
   if (!order || !canSeeUnit(session, order.unitId)) return { error: "Pedido não encontrado", status: 404 } as const;
   return { order } as const;
 }

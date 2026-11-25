@@ -94,6 +94,19 @@ async function main() {
       "lots" JSONB
     )`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PurchaseOrderItem_orderId_idx" ON "PurchaseOrderItem"("orderId")`);
+  // Nov/2026: loja (carrinho) no lugar do formulário — linhas compradas, com o preço do dia
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PurchaseOrderLine" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "orderId" TEXT NOT NULL REFERENCES "PurchaseOrder"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      "position" INTEGER NOT NULL,
+      "storeId" TEXT NOT NULL,
+      "variant" TEXT,
+      "name" TEXT NOT NULL,
+      "quantity" INTEGER NOT NULL,
+      "unitPrice" INTEGER NOT NULL
+    )`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PurchaseOrderLine_orderId_idx" ON "PurchaseOrderLine"("orderId")`);
 
   // Nov/2026: abertura de OS liberada para os veterinários clínicos de todas as UABCs
   await once("2026-11-os-todas-unidades", async () => {

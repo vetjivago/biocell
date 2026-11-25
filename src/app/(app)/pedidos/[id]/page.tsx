@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { standardProduct } from "@/lib/products";
-import { ORDER_STATUS, RACKS, brl, canProcessPurchases, isCellItem, orderTotals, parseLots } from "@/lib/purchase-orders";
+import { ORDER_STATUS, RACKS, brl, canProcessPurchases, canRequestPurchases, isCellItem, orderTotals, parseLots } from "@/lib/purchase-orders";
 import { getAccessiblePurchaseOrder } from "@/lib/purchase-orders-server";
 import PrintButton from "../../pacientes/[id]/geral/PrintButton";
+import StoreNav from "../StoreNav";
 import { PurchaseEditor, UnitActions } from "./PurchaseActions";
 
 const tz = { timeZone: "America/Sao_Paulo" } as const;
@@ -46,6 +47,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="max-w-4xl">
+      <StoreNav userId={session.id} canBuy={canRequestPurchases(session.role)} ordersLabel={admin || !canRequestPurchases(session.role) ? "Pedidos" : "Meus pedidos"} />
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
         <Link href="/pedidos" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
           <ArrowLeft size={16} /> Pedidos de compra
@@ -73,6 +75,24 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
+        {order.lines.length > 0 && (
+          <div className="mb-5 break-inside-avoid">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1">Itens comprados na loja</p>
+            <table className="w-full text-sm">
+              <tbody>
+                {order.lines.map((l) => (
+                  <tr key={l.id} className="border-b border-gray-100">
+                    <td className="py-1.5 pr-2">{l.name}</td>
+                    <td className="py-1.5 px-2 text-right text-gray-500 whitespace-nowrap">{l.quantity} × {brl(l.unitPrice)}</td>
+                    <td className="py-1.5 pl-2 text-right font-medium whitespace-nowrap">{brl(l.quantity * l.unitPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1">Reposição UABC — o que vai na caixa</p>
         <table className="w-full text-sm mb-4">
           <thead>
             <tr className="border-b border-gray-200 text-xs text-gray-500">
@@ -114,6 +134,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           </Box>
           <Box title="Financeiro">
             <p>Células: {brl(totals.cells)} ({order.items.filter((i) => isCellItem(i.productId)).reduce((s, i) => s + i.quantity, 0)} palhetas)</p>
+            {totals.cart > 0 && <p>Outros itens da loja: {brl(totals.cart)}</p>}
             {totals.box > 0 && <p>Caixa de isopor: {brl(totals.box)}</p>}
             {totals.ringer > 0 && <p>Ringer: {brl(totals.ringer)}</p>}
             {totals.equipo > 0 && <p>Equipo: {brl(totals.equipo)}</p>}
@@ -144,6 +165,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
               paymentMethod: order.paymentMethod ?? "", installments: order.installments ?? "", adminNotes: order.adminNotes ?? "",
             }}
             items={order.items.map((it) => ({ id: it.id, productId: it.productId, calculated: it.calculated, quantity: it.quantity, lots: parseLots(it.lots) }))}
+            lines={order.lines.map((l) => ({ storeId: l.storeId, quantity: l.quantity, unitPrice: l.unitPrice }))}
           />
         </div>
       )}
