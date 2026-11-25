@@ -7,9 +7,14 @@ import { cache } from "react";
 import { normalizePhone } from "./phone";
 import { canOpenPage, canWriteApi, homePage } from "./roles";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "biocell-dev-secret"
-);
+// Segredo que assina as sessões. O código é público: em produção NUNCA cair num valor padrão
+// (quem conhecesse o padrão conseguiria se passar por qualquer usuário)
+const DEV_SECRET = "biocell-dev-secret";
+function secretKey() {
+  const value = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!value && process.env.NODE_ENV === "production") throw new Error("JWT_SECRET não configurado");
+  return new TextEncoder().encode(value || DEV_SECRET);
+}
 
 export interface SessionUser {
   id: string;
@@ -26,7 +31,7 @@ export async function signToken(user: SessionUser, expiresIn = "8h") {
   return new SignJWT({ user })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(expiresIn)
-    .sign(SECRET);
+    .sign(secretKey());
 }
 
 export async function createSession(user: SessionUser) {
@@ -83,7 +88,7 @@ async function readSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, secretKey());
     const tokenUser = (payload as { user?: SessionUser }).user;
     if (!tokenUser?.id) return null;
     return await loadUser(tokenUser.id);

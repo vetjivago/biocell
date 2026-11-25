@@ -10,13 +10,7 @@ Abra o navegador e acesse:
 
 **https://biocell-mu.vercel.app**
 
-Na tela de login, digite seu e-mail e senha.
-
-| Perfil | E-mail | Senha |
-| --- | --- | --- |
-| Administrador (Matriz) | admin@biocell.com | biocell123 |
-| Profissional | joao@clinilab.com | biocell123 |
-| Gestora de Unidade | maria@clinilab.com | biocell123 |
+Na tela de login, digite seu e-mail (ou celular) e a senha que você recebeu. No primeiro acesso, o sistema pede para criar uma senha pessoal.
 
 O **Administrador** enxerga todas as 74 unidades (matriz + 73 UABCs). Os demais perfis veem apenas a unidade a que estão vinculados.
 

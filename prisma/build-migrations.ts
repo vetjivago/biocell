@@ -15,7 +15,19 @@ async function once(name: string, run: () => Promise<string>) {
   console.log(`[${name}] ${await run()}`);
 }
 
+// O repositório é público: o build da Vercel não segue sem um segredo de sessão próprio
+function checkSessionSecret() {
+  if (!process.env.VERCEL) return;
+  const value = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "";
+  const known = ["biocell-dev-secret", "gere-uma-string-aleatoria-de-64-caracteres"];
+  if (value.length < 32 || known.includes(value)) {
+    throw new Error("Configure JWT_SECRET na Vercel (Settings → Environment Variables) com uma string aleatória de 32+ caracteres");
+  }
+  console.log("[segurança] JWT_SECRET configurado");
+}
+
 async function main() {
+  checkSessionSecret();
   await prisma.$executeRawUnsafe(`ALTER TABLE "Patient" ADD COLUMN IF NOT EXISTS "archivedAt" TIMESTAMP(3)`);
   await prisma.$executeRawUnsafe(
     `CREATE TABLE IF NOT EXISTS "AppMigration" ("name" TEXT PRIMARY KEY, "ranAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
