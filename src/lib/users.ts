@@ -4,7 +4,7 @@ import { ROLES, assignableRoles, canManageUsers, seesAllUnits, hasRole, type Rol
 import { normalizePhone } from "./phone";
 
 // Acessos que têm alguma destas funções (a coluna guarda várias, separadas por vírgula)
-function withAnyRole(roles: Role[]) {
+export function withAnyRole(roles: readonly Role[]) {
   return roles.flatMap((r) => [{ role: r }, { role: { startsWith: `${r},` } }, { role: { endsWith: `,${r}` } }, { role: { contains: `,${r},` } }]);
 }
 

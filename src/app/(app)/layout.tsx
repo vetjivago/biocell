@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { prisma } from "@/lib/prisma";
 import { canFillOrderRecord, serviceOrderUnitIds } from "@/lib/service-orders";
-import { canProcessPurchases } from "@/lib/purchase-orders";
+import { seesWaitingPurchases } from "@/lib/purchase-orders";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -16,8 +16,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const openOrders = hasServiceOrders && canFillOrderRecord(session.role)
     ? await prisma.alert.count({ where: { type: "SERVICE_ORDER", resolved: false, unitId: { in: orderUnitIds } } })
     : 0;
-  // Pedidos de compra das UABCs aguardando a matriz/logística
-  const waitingPurchases = canProcessPurchases(session.role)
+  // Pedidos de compra das UABCs aguardando (matriz, logística, administrativo e comercial)
+  const waitingPurchases = seesWaitingPurchases(session.role)
     ? await prisma.purchaseOrder.count({ where: { status: "WAITING" } }).catch(() => 0)
     : 0;
 

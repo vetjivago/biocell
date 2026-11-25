@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { seesAllUnits } from "@/lib/roles";
-import { ORDER_STATUS, RACKS, brl, canProcessPurchases, canRequestPurchases, canViewPurchases, isCellItem, orderTotals } from "@/lib/purchase-orders";
+import { ORDER_STATUS, RACKS, brl, canRequestPurchases, canViewPurchases, isCellItem, orderTotals } from "@/lib/purchase-orders";
 import StoreNav from "./StoreNav";
 
 const FILTERS = [
@@ -52,13 +52,12 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
     return `/pedidos${p.size ? `?${p}` : ""}`;
   };
 
-  // Matriz e logística veem os pedidos de todas as unidades; a unidade, os seus
-  const processor = canProcessPurchases(session.role);
+  // Matriz, logística, administrativo e comercial veem os pedidos de todas as unidades; a unidade, os seus
   return (
     <div>
-      <StoreNav userId={session.id} canBuy={canRequestPurchases(session.role)} ordersLabel={processor || !canRequestPurchases(session.role) ? "Pedidos" : "Meus pedidos"} />
+      <StoreNav userId={session.id} canBuy={canRequestPurchases(session.role)} ordersLabel={allUnits ? "Pedidos" : "Meus pedidos"} />
       <div className="mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">{processor ? "Pedidos das unidades" : "Meus pedidos"}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{allUnits ? "Pedidos das unidades" : "Meus pedidos"}</h1>
         <p className="text-sm text-gray-500 mt-1">Ao fechar o carrinho, meios, soros e materiais das raques são calculados pelo estoque da unidade</p>
       </div>
 
