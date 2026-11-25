@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Minus, Plus, ShoppingCart } from "lucide-react";
 import { standardProduct } from "@/lib/products";
-import { ITEM_PRICES, MIN_STRAWS, RACKS, STRAW_PRICE, type Racks, brl, calculateOrder, isCellItem, orderTotals, strawsOf, suggestedExtra } from "@/lib/purchase-orders";
+import { ITEM_PRICES, MIN_STRAWS, RACKS, STRAW_PRICE, type Racks, brl, calculateOrder, isCellItem, orderTotals, strawsOf } from "@/lib/purchase-orders";
 
 type Unit = { id: string; name: string };
 const field = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary";
@@ -35,7 +35,7 @@ export default function NewPurchaseForm({ units, isAdmin }: { units: Unit[]; isA
     const extra = isCellItem(i.productId) ? 0 : Math.max(0, parseInt(extras[i.productId] || "0") || 0);
     return { ...i, extra, quantity: i.calculated + extra };
   });
-  const totals = orderTotals({ items: rows, dryIce: false, dryIceQty: 0, freight: 0, extraValue: suggestedExtra(rows), discount: 0 });
+  const totals = orderTotals({ items: rows, dryIce: false, dryIceQty: 0, freight: 0, extraValue: 0, discount: 0 });
   const belowMin = straws > 0 && straws < MIN_STRAWS;
 
   const setRack = (key: keyof Racks, n: number) => setRacks((r) => ({ ...r, [key]: Math.max(0, Math.min(100, n)) }));
@@ -161,8 +161,7 @@ export default function NewPurchaseForm({ units, isAdmin }: { units: Unit[]; isA
         <div className="text-sm text-gray-700 space-y-1">
           <p>Células: <strong>{brl(totals.cells)}</strong></p>
           {totals.box + totals.ringer + totals.equipo > 0 && <p>Isopor, ringer e equipo: <strong>{brl(totals.box + totals.ringer + totals.equipo)}</strong></p>}
-          {suggestedExtra(rows) > 0 && <p>Extras: <strong>{brl(suggestedExtra(rows))}</strong></p>}
-          <p className="text-base">Estimativa: <strong>{brl(totals.total)}</strong> <span className="text-xs text-gray-500">(frete, gelo seco e condições de pagamento são definidos pela matriz)</span></p>
+          <p className="text-base">Estimativa: <strong>{brl(totals.total)}</strong> <span className="text-xs text-gray-500">(extras cobrados, frete, gelo seco e pagamento são definidos pela matriz)</span></p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={submit} disabled={loading || !calc}
