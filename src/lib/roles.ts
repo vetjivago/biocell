@@ -2,7 +2,7 @@
 export const ROLES = {
   ADMIN: { label: "Matriz (administrador)", description: "Acesso total: todas as unidades, prontuários, estoque, relatórios e acessos." },
   ADMINISTRATIVE: { label: "Administrativo", description: "Abre novas UABCs e cadastra usuários." },
-  COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard e relatórios de todas as unidades, sem alterar nada." },
+  COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard, relatórios e usuários de todas as unidades, sem alterar nada." },
   UNIT_MANAGER: { label: "Gestor da unidade", description: "Tudo da(s) sua(s) unidade(s), inclusive criar acessos da equipe." },
   PROFESSIONAL: { label: "Veterinário clínico", description: "Pacientes, prontuários e abertura de Ordens de Serviço." },
   LAB: { label: "Laboratório / preparo", description: "Fila de Ordens de Serviço, preparo das células e prontuário CT." },
@@ -65,6 +65,11 @@ export function canManageUsers(role: string) {
   return hasRole(role, "ADMIN", "ADMINISTRATIVE", "UNIT_MANAGER");
 }
 
+// Ver a lista de usuários: quem gerencia acessos e o comercial (este só consulta, vê todos)
+export function canViewUsers(role: string) {
+  return canManageUsers(role) || hasRole(role, "COMMERCIAL");
+}
+
 // Abrir e editar UABCs
 export function canManageUnits(role: string) {
   return hasRole(role, "ADMIN", "ADMINISTRATIVE");
@@ -89,7 +94,7 @@ export function canRegisterLoss(role: string) {
 // Perfis com telas limitadas: só podem abrir estas páginas e só alterar por estas APIs
 // (os demais seguem as regras de cada tela)
 const ROLE_PAGES: Partial<Record<Role, string[]>> = {
-  COMMERCIAL: ["/dashboard", "/relatorios", "/unidades", "/conta"],
+  COMMERCIAL: ["/dashboard", "/relatorios", "/unidades", "/usuarios", "/conta"],
   ADMINISTRATIVE: ["/dashboard", "/unidades", "/usuarios", "/conta"],
 };
 const ROLE_WRITE_APIS: Partial<Record<Role, string[]>> = {

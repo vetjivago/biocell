@@ -4,19 +4,21 @@ import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { canManageUsers, needsUnits, roleLabel, seesAllUnits } from "@/lib/roles";
+import { canManageUsers, canViewUsers, needsUnits, roleLabel, seesAllUnits } from "@/lib/roles";
 import { manageableUsersWhere } from "@/lib/users";
 
 export default async function UsuariosPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await getSession();
   if (!session) return null;
-  if (!canManageUsers(session.role)) notFound();
+  if (!canViewUsers(session.role)) notFound();
+  // Comercial só consulta: vê todos os acessos, sem criar nem abrir para editar
+  const canManage = canManageUsers(session.role);
   const { q } = await searchParams;
   const query = q?.trim();
 
   const users = await prisma.user.findMany({
     where: {
-      ...manageableUsersWhere(session),
+      ...(canManage ? manageableUsersWhere(session) : { deletedAt: null }),
       ...(query ? { OR: [{ name: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }, ...(query.replace(/\D/g, "").length >= 4 ? [{ phone: { contains: query.replace(/\D/g, "") } }] : []), { units: { some: { unit: { name: { contains: query, mode: "insensitive" } } } } }] } : {}),
     },
     select: {
@@ -35,9 +37,11 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
             {users.length} acesso(s){seesAllUnits(session.role) ? "" : " da(s) sua(s) unidade(s)"}
           </p>
         </div>
-        <Link href="/usuarios/novo" className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium">
-          <Plus size={16} /> Novo acesso
-        </Link>
+        {canManage && (
+          <Link href="/usuarios/novo" className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+            <Plus size={16} /> Novo acesso
+          </Link>
+        )}
       </div>
 
       <form className="mb-4">
@@ -59,7 +63,11 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Pro
             {users.map((u) => (
               <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${u.active ? "" : "opacity-60"}`}>
                 <td className="px-4 py-3">
-                  <Link href={`/usuarios/${u.id}`} className="text-sm font-medium text-primary hover:underline">{u.name}</Link>
+                  {canManage ? (
+                    <Link href={`/usuarios/${u.id}`} className="text-sm font-medium text-primary hover:underline">{u.name}</Link>
+                  ) : (
+                    <p className="text-sm font-medium text-gray-900">{u.name}</p>
+                  )}
                   <p className="text-xs text-gray-500">{[u.email, formatPhone(u.phone)].filter(Boolean).join(" · ")}</p>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700">{roleLabel(u.role)}</td>
