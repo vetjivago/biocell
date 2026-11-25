@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { MIN_STRAWS, RACKS, type Racks, calculateOrder, canProcessPurchases, canRequestPurchases, strawsOf } from "@/lib/purchase-orders";
+import { MIN_STRAWS, RACKS, type Racks, brl, calculateOrder, canProcessPurchases, canRequestPurchases, strawsOf } from "@/lib/purchase-orders";
 import { canSeeUnit, unitStockByProduct } from "@/lib/purchase-orders-server";
 import { type CartLine, lineName, lineStock, parseCartLine, storeProduct } from "@/lib/store";
+import { sendPurchaseOrderEmail } from "@/lib/mailer";
+import { withAnyRole } from "@/lib/users";
 
 // Fecha o carrinho da loja: raques viram células do pedido e o kit da OS (meios, soros e materiais)
 // é calculado aqui pelo estoque da unidade; os demais itens do carrinho entram como "pedido extra"
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const unitId = typeof body.unitId === "string" ? body.unitId : "";
   if (!unitId || !canSeeUnit(session, unitId)) return Response.json({ error: "Escolha a unidade" }, { status: 400 });
-  const unit = await prisma.unit.findFirst({ where: { id: unitId, active: true }, select: { id: true } });
+  const unit = await prisma.unit.findFirst({ where: { id: unitId, active: true }, select: { id: true, name: true } });
   if (!unit) return Response.json({ error: "Unidade não encontrada" }, { status: 404 });
 
   // Junta linhas repetidas (mesmo produto e variação)
@@ -65,5 +67,20 @@ export async function POST(request: NextRequest) {
   await prisma.auditLog.create({
     data: { userId: session.id, action: "CREATE", entity: "PurchaseOrder", entityId: order.id, details: JSON.stringify({ number: order.number, unitId, racks, lines: lines.length }) },
   });
+
+  // Aviso por e-mail para o administrativo e o comercial (no menu, todos veem o contador de pedidos aguardando)
+  const recipients = await prisma.user.findMany({
+    where: { organizationId: session.organizationId, active: true, deletedAt: null, email: { not: null }, OR: withAnyRole(["ADMINISTRATIVE", "COMMERCIAL"]) },
+    select: { email: true },
+  });
+  await sendPurchaseOrderEmail(
+    recipients.map((r) => r.email!).filter(Boolean),
+    {
+      number: order.number, unitName: unit.name, requester: session.name, straws, notes,
+      lines: lines.map((l) => ({ name: lineName(storeProduct(l.productId)!, l.variant), quantity: l.quantity })),
+      subtotal: brl(lines.reduce((s, l) => s + l.quantity * storeProduct(l.productId)!.price, 0)),
+    },
+    `${new URL(request.url).origin}/pedidos/${order.id}`,
+  );
   return Response.json(order, { status: 201 });
 }

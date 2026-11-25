@@ -46,3 +46,45 @@ export async function sendAccessEmail(
     return false;
   }
 }
+
+// Aviso de pedido de compra novo (administrativo e comercial); devolve quantos receberam.
+// Falha no envio não impede o pedido
+export async function sendPurchaseOrderEmail(
+  to: string[],
+  order: { number: number; unitName: string; requester: string; straws: number; lines: { name: string; quantity: number }[]; subtotal: string; notes: string | null },
+  url: string,
+) {
+  if (!to.length || !mailerConfigured()) return 0;
+  const items = order.lines.map((l) => `• ${l.quantity} × ${l.name}`).join("\n");
+  const text = [
+    `Novo pedido de compra nº ${order.number}`,
+    "",
+    `Unidade: ${order.unitName}`,
+    `Solicitante: ${order.requester}`,
+    `Células: ${order.straws} palhetas`,
+    "",
+    "Itens do carrinho:",
+    items,
+    "",
+    `Subtotal: ${order.subtotal} (frete, gelo seco e pagamento são definidos pela matriz)`,
+    ...(order.notes ? ["", `Observações: ${order.notes}`] : []),
+    "",
+    `Ver o pedido: ${url}`,
+  ].join("\n");
+  try {
+    await transport().sendMail({
+      from: process.env.SMTP_FROM || `BIO CELL <${process.env.SMTP_USER}>`,
+      to: process.env.SMTP_FROM || process.env.SMTP_USER,
+      bcc: to,
+      subject: `Novo pedido de compra nº ${order.number} – ${order.unitName}`,
+      text,
+      html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#1f2937;line-height:1.5">${escapeHtml(text)
+        .replace(/\n/g, "<br>")
+        .replace(escapeHtml(url), `<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`)}</div>`,
+    });
+    return to.length;
+  } catch (err) {
+    console.error("Erro ao enviar aviso de pedido de compra:", err);
+    return 0;
+  }
+}

@@ -136,9 +136,15 @@ export function canRequestPurchases(role: string) {
   return hasRole(role, "ADMIN", "STOCK", "UNIT_MANAGER");
 }
 
-// Quem enxerga a tela de pedidos (o comercial só consulta)
+// Quem enxerga a tela de pedidos (administrativo e comercial só consultam)
 export function canViewPurchases(role: string) {
-  return canRequestPurchases(role) || hasRole(role, "COMMERCIAL");
+  return canRequestPurchases(role) || hasRole(role, "ADMINISTRATIVE", "COMMERCIAL");
+}
+
+// Quem é avisado de pedido novo: contador no menu e e-mail
+export const NOTIFY_ROLES = ["ADMIN", "STOCK", "ADMINISTRATIVE", "COMMERCIAL"] as const;
+export function seesWaitingPurchases(role: string) {
+  return hasRole(role, ...NOTIFY_ROLES);
 }
 
 export type Lot = { batchNumber: string; quantity: number };
