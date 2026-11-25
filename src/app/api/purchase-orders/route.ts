@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (rack) racks[rack] = Math.min(100, racks[rack] + l.quantity);
   }
   const straws = strawsOf(racks);
-  // Mínimo de 48 palhetas por pedido de células (a matriz pode lançar abaixo disso)
+  // Mínimo de 48 palhetas por pedido de células (quem atende pode lançar abaixo disso)
   if (straws > 0 && straws < MIN_STRAWS && !canProcessPurchases(session.role)) {
     return Response.json({ error: `Pedido de células: mínimo de ${MIN_STRAWS} palhetas (pode misturar espécies). No carrinho: ${straws}` }, { status: 400 });
   }

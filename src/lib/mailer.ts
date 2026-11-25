@@ -66,7 +66,7 @@ export async function sendPurchaseOrderEmail(
     "Itens do carrinho:",
     items,
     "",
-    `Subtotal: ${order.subtotal} (frete, gelo seco e pagamento são definidos pela matriz)`,
+    `Subtotal: ${order.subtotal} (frete, gelo seco e pagamento são definidos pelo administrativo e pela logística)`,
     ...(order.notes ? ["", `Observações: ${order.notes}`] : []),
     "",
     `Ver o pedido: ${url}`,

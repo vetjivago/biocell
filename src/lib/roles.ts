@@ -1,7 +1,7 @@
 // Funções de acesso do sistema (sem dependências de servidor: usadas também no navegador)
 export const ROLES = {
   ADMIN: { label: "Matriz (administrador)", description: "Acesso total: todas as unidades, prontuários, estoque, relatórios e acessos." },
-  ADMINISTRATIVE: { label: "Administrativo", description: "Abre novas UABCs, cadastra usuários e acompanha os pedidos de compra." },
+  ADMINISTRATIVE: { label: "Administrativo", description: "Abre novas UABCs, cadastra usuários e atende os pedidos de compra (com a logística)." },
   COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard, relatórios, pedidos e usuários de todas as unidades, sem alterar nada." },
   UNIT_MANAGER: { label: "Gestor da unidade", description: "Tudo da(s) sua(s) unidade(s), inclusive criar acessos da equipe." },
   PROFESSIONAL: { label: "Veterinário clínico", description: "Pacientes, prontuários e abertura de Ordens de Serviço." },
@@ -99,7 +99,7 @@ const ROLE_PAGES: Partial<Record<Role, string[]>> = {
 };
 const ROLE_WRITE_APIS: Partial<Record<Role, string[]>> = {
   COMMERCIAL: ["/api/auth", "/api/account"],
-  ADMINISTRATIVE: ["/api/auth", "/api/account", "/api/units", "/api/users"],
+  ADMINISTRATIVE: ["/api/auth", "/api/account", "/api/units", "/api/users", "/api/purchase-orders"],
 };
 const under = (path: string, prefixes: string[]) => prefixes.some((p) => path === p || path.startsWith(p + "/"));
 
