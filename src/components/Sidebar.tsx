@@ -16,6 +16,7 @@ import {
   UserCog,
   Tag,
   ScanSearch,
+  ShoppingCart,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: "/pacientes", label: "Pacientes", icon: Users, roles: CLINICAL_ROLES },
   { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: CLINICAL_ROLES, serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
+  { href: "/pedidos", label: "Pedidos de compra", icon: ShoppingCart, roles: ["ADMIN", "STOCK", "UNIT_MANAGER", "COMMERCIAL"] as Role[] },
   { href: "/rastreabilidade", label: "Rastreabilidade", icon: ScanSearch, roles: ["ADMIN", "STOCK", "UNIT_MANAGER"] as Role[] },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "ADMINISTRATIVE", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
@@ -35,7 +37,7 @@ const NAV_ITEMS = [
   { href: "/usuarios", label: "Usuários", icon: UserCog, roles: ["ADMIN", "ADMINISTRATIVE", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
 ];
 
-export default function Sidebar({ userName, userRole, hasServiceOrders = false, openOrders = 0 }: { userName: string; userRole: string; hasServiceOrders?: boolean; openOrders?: number }) {
+export default function Sidebar({ userName, userRole, hasServiceOrders = false, openOrders = 0, waitingPurchases = 0 }: { userName: string; userRole: string; hasServiceOrders?: boolean; openOrders?: number; waitingPurchases?: number }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -83,7 +85,8 @@ export default function Sidebar({ userName, userRole, hasServiceOrders = false, 
           {NAV_ITEMS.filter((item) => (!item.roles || hasRole(userRole, ...item.roles)) && canOpenPage(userRole, item.href) && (!("serviceOrders" in item) || hasServiceOrders)).map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             // Alerta "OS aberta" para o laboratório
-            const badge = item.href === "/ordens-servico" || item.href === "/alertas" ? openOrders : 0;
+            // e pedidos de compra aguardando a matriz
+            const badge = item.href === "/ordens-servico" || item.href === "/alertas" ? openOrders : item.href === "/pedidos" ? waitingPurchases : 0;
             return (
               <Link
                 key={item.href}
@@ -98,7 +101,7 @@ export default function Sidebar({ userName, userRole, hasServiceOrders = false, 
                 <item.icon size={18} />
                 <span className="flex-1">{item.label}</span>
                 {badge > 0 && (
-                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-400 text-sidebar text-xs font-bold flex items-center justify-center" title="OS aberta aguardando preparo">{badge}</span>
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-400 text-sidebar text-xs font-bold flex items-center justify-center" title={item.href === "/pedidos" ? "Pedidos aguardando" : "OS aberta aguardando preparo"}>{badge}</span>
                 )}
               </Link>
             );

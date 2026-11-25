@@ -69,6 +69,7 @@ model Unit {
   serviceOrders         ServiceOrder[]
   sales                 Sale[]
   documents             UnitDocument[]
+  purchaseOrders        PurchaseOrder[]
 
   @@index([organizationId])
 }
@@ -640,6 +641,65 @@ model SaleItem {
 
   @@index([saleId])
   @@index([description])
+}
+
+// ── Pedidos de compra das UABCs (substitui a loja do Sults) ─────
+// A unidade informa as raques de células; o sistema calcula o restante a enviar pela regra
+// da OS de reposição (src/lib/purchase-orders.ts). Valores em centavos.
+model PurchaseOrder {
+  id            String    @id @default(cuid())
+  number        Int       @unique @default(autoincrement())
+  unitId        String
+  unit          Unit      @relation(fields: [unitId], references: [id])
+  createdById   String
+  createdByName String
+  // WAITING (aguardando) → INVOICED (faturado) → SHIPPED (enviado: entra no estoque da unidade) → DELIVERED; ou CANCELLED
+  status        String    @default("WAITING")
+  racksCanine   Int       @default(0)
+  racksFeline   Int       @default(0)
+  racksEquine   Int       @default(0)
+  notes         String?
+  // Logística e financeiro (preenchidos pela matriz)
+  dryIce        Boolean   @default(false)
+  dryIceQty     Int       @default(0)
+  shippingMode  String?
+  carrier       String?
+  freight       Int       @default(0)
+  extraValue    Int       @default(0)
+  discount      Int       @default(0)
+  paymentMethod String?
+  installments  String?
+  adminNotes    String?
+  invoicedAt    DateTime?
+  shippedAt     DateTime?
+  shippedBy     String?
+  deliveredAt   DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items PurchaseOrderItem[]
+
+  @@index([unitId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id         String        @id @default(cuid())
+  orderId    String
+  order      PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  position   Int
+  // Estoque da unidade no momento do pedido e quantidade calculada pela regra
+  stockQty   Int           @default(0)
+  calculated Int           @default(0)
+  extra      Int           @default(0)
+  // Total a enviar (calculado + extra; a matriz pode ajustar)
+  quantity   Int           @default(0)
+  // Lotes enviados: [{ "batchNumber": "...", "quantity": n }]
+  lots       Json?
+
+  @@index([orderId])
 }
 
 // ── Ajustes de dados feitos uma única vez (rodam no build: prisma/build-migrations.ts) ──
