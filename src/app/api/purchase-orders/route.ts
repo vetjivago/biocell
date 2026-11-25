@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { NextRequest } from "next/server";
-import { MIN_STRAWS, ORDER_ITEMS, RACKS, type Racks, calculateOrder, canProcessPurchases, canRequestPurchases, strawsOf, suggestedExtra } from "@/lib/purchase-orders";
+import { MIN_STRAWS, ORDER_ITEMS, RACKS, type Racks, calculateOrder, canProcessPurchases, canRequestPurchases, strawsOf } from "@/lib/purchase-orders";
 import { canSeeUnit, unitStockByProduct } from "@/lib/purchase-orders-server";
 
 const int = (v: unknown, max = 9999) => Math.min(max, Math.max(0, Math.trunc(Number(v) || 0)));
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2000) || null : null;
   const order = await prisma.purchaseOrder.create({
-    data: { unitId, createdById: session.id, createdByName: session.name, ...racks, notes, extraValue: suggestedExtra(rows), items: { create: rows } },
+    data: { unitId, createdById: session.id, createdByName: session.name, ...racks, notes, items: { create: rows } },
   });
   await prisma.auditLog.create({
     data: { userId: session.id, action: "CREATE", entity: "PurchaseOrder", entityId: order.id, details: JSON.stringify({ number: order.number, unitId, racks }) },

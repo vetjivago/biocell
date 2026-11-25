@@ -83,37 +83,18 @@ export function calculateOrder(stock: Record<string, number>, racks: Racks) {
   return { kits, items };
 }
 
-// ── Preços (centavos): célula pela OS de reposição; insumos pela loja do Sults ─────────────
+// ── Preços (centavos), pela planilha "MATRIZ OS EDITÁVEL 2026" ───────────────────────────
 export const STRAW_PRICE = 17100; // R$ 171,00 por palheta (raque de cão R$ 2.736,00)
 export const DRY_ICE_PRICE = 4750; // R$ 47,50 por unidade de gelo seco
-// Itens cobrados quando enviados (isopor, ringer, equipo) ou quando pedidos como extra
+// Itens cobrados pela quantidade enviada; o resto do material vai sem custo, e o que for
+// cobrado à parte (meios e soros extras etc.) a matriz lança no campo "Extra"
 export const ITEM_PRICES: Record<string, number> = {
   prod_caixa_isopor: 940,
-  prod_ringer_lactato: 1325,
-  prod_equipo_fotoprotetor: 950,
-  prod_meio_descongelamento: 625,
-  prod_meio_lavagem: 625,
-  prod_meio_transporte: 625,
-  prod_soro_canino: 500,
-  prod_soro_felino: 500,
-  prod_soro_equino: 500,
-  prod_ponteira_azul: 260,
-  prod_ponteira_amarela: 340,
-  prod_cateter_16g: 455,
-  prod_certificado: 240,
+  prod_ringer_lactato: 900,
+  prod_equipo_fotoprotetor: 760,
 };
-// Cobrados sempre pela quantidade enviada (os demais só no que passar do calculado)
-const CHARGED_ITEMS = ["prod_caixa_isopor", "prod_ringer_lactato", "prod_equipo_fotoprotetor"];
 
-type PricedItem = { productId: string; quantity: number; calculated: number };
-
-// Valor sugerido do "Extra": o que a unidade pediu além do calculado, pelos preços da loja
-export function suggestedExtra(items: PricedItem[]) {
-  return items.reduce((s, i) => {
-    if (isCellItem(i.productId) || CHARGED_ITEMS.includes(i.productId)) return s;
-    return s + Math.max(0, i.quantity - i.calculated) * (ITEM_PRICES[i.productId] || 0);
-  }, 0);
-}
+type PricedItem = { productId: string; quantity: number };
 
 export function orderTotals(o: { items: PricedItem[]; dryIce: boolean; dryIceQty: number; freight: number; extraValue: number; discount: number }) {
   const qty = (id: string) => o.items.filter((i) => i.productId === id).reduce((s, i) => s + i.quantity, 0);
