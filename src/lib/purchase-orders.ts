@@ -87,7 +87,7 @@ export function calculateOrder(stock: Record<string, number>, racks: Racks) {
 export const STRAW_PRICE = 17100; // R$ 171,00 por palheta (raque de cão R$ 2.736,00)
 export const DRY_ICE_PRICE = 4750; // R$ 47,50 por unidade de gelo seco
 // Itens cobrados pela quantidade enviada; o resto do material vai sem custo, e o que for
-// cobrado à parte (meios e soros extras etc.) a matriz lança no campo "Extra"
+// cobrado à parte (meios e soros extras etc.) quem atende lança no campo "Extra"
 export const ITEM_PRICES: Record<string, number> = {
   prod_caixa_isopor: 940,
   prod_ringer_lactato: 900,
@@ -126,19 +126,19 @@ export const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
 export const SHIPPING_MODES = ["TERRESTRE", "AÉREA", "RETIRADA"];
 export const PAYMENT_METHODS = ["BOLETO", "PIX", "TRANSFERÊNCIA", "CARTÃO"];
 
-// Matriz e logística recebem, faturam e enviam os pedidos de todas as unidades
+// Administrativo e logística (e a matriz, que tem acesso total) ajustam, faturam e enviam os pedidos de todas as unidades
 export function canProcessPurchases(role: string) {
-  return hasRole(role, "ADMIN", "STOCK");
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "STOCK");
 }
 
-// Gestor faz o pedido das suas unidades; a matriz também pode lançar por uma unidade
+// Gestor faz o pedido das suas unidades; quem atende também pode lançar por uma unidade
 export function canRequestPurchases(role: string) {
-  return hasRole(role, "ADMIN", "STOCK", "UNIT_MANAGER");
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "STOCK", "UNIT_MANAGER");
 }
 
-// Quem enxerga a tela de pedidos (administrativo e comercial só consultam)
+// Quem enxerga a tela de pedidos (o comercial só consulta)
 export function canViewPurchases(role: string) {
-  return canRequestPurchases(role) || hasRole(role, "ADMINISTRATIVE", "COMMERCIAL");
+  return canRequestPurchases(role) || hasRole(role, "COMMERCIAL");
 }
 
 // Quem é avisado de pedido novo: contador no menu e e-mail

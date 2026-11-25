@@ -10,8 +10,8 @@ const int = (v: unknown, max = 99999) => Math.min(max, Math.max(0, Math.trunc(Nu
 const cents = (v: unknown) => Math.min(100_000_000, Math.max(0, Math.round(Number(v) || 0)));
 const text = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) || null : null);
 
-// Ações: save (matriz ajusta quantidades, lotes, logística e financeiro), invoice, ship (entra no estoque
-// da unidade), deliver (unidade ou matriz confirma a chegada) e cancel
+// Ações: save (administrativo/logística ajustam quantidades, lotes, logística e financeiro), invoice, ship (entra no estoque
+// da unidade), deliver (unidade ou quem atende confirma a chegada) e cancel
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: "Não autorizado" }, { status: 401 });
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   });
 
   if (action === "cancel") {
-    // A unidade cancela enquanto aguarda; a matriz até o envio
+    // A unidade cancela enquanto aguarda; quem atende, até o envio
     const allowed = admin ? ["WAITING", "INVOICED"].includes(order.status) : isOwnUnit && order.status === "WAITING";
     if (!allowed) return Response.json({ error: "Este pedido não pode mais ser cancelado" }, { status: 400 });
     await prisma.purchaseOrder.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
@@ -46,7 +46,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!admin) return Response.json({ error: "Sem permissão" }, { status: 403 });
   if (!["WAITING", "INVOICED"].includes(order.status)) return Response.json({ error: "Pedido já enviado ou cancelado: não pode mais ser alterado" }, { status: 400 });
 
-  // Ajustes da matriz (vêm junto em save, invoice e ship)
+  // Ajustes de quem atende (vêm junto em save, invoice e ship)
   if (body.items !== undefined || body.order !== undefined) {
     const items = Array.isArray(body.items) ? body.items : [];
     const o = body.order ?? {};

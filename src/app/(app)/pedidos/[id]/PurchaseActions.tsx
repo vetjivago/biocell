@@ -62,7 +62,7 @@ type ItemState = { id: string; productId: string; calculated: number; quantity: 
 const money = (cents: number) => (cents ? (cents / 100).toFixed(2).replace(".", ",") : "");
 const toCents = (v: string) => Math.round((parseFloat(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v) || 0) * 100);
 
-// Matriz / logística: ajusta quantidades, informa lotes, logística e financeiro; fatura, envia ou cancela
+// Administrativo e logística (e a matriz): ajusta quantidades, informa lotes, logística e financeiro; fatura, envia ou cancela
 export function PurchaseEditor({ order, items, lines = [] }: { order: Order; items: Item[]; lines?: { storeId: string; quantity: number; unitPrice: number }[] }) {
   const router = useRouter();
   const [rows, setRows] = useState<ItemState[]>(items.map((i) => ({
@@ -112,7 +112,7 @@ export function PurchaseEditor({ order, items, lines = [] }: { order: Order; ite
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-5">
       <div>
-        <h2 className="font-semibold text-gray-900">Atendimento do pedido (matriz)</h2>
+        <h2 className="font-semibold text-gray-900">Atendimento do pedido (administrativo e logística)</h2>
         <p className="text-xs text-gray-500">Ajuste o que vai, informe os lotes de células, meios e soros e dê andamento. Ao marcar como enviado, os itens entram no estoque da unidade.</p>
       </div>
 
@@ -199,7 +199,7 @@ export function PurchaseEditor({ order, items, lines = [] }: { order: Order; ite
           <input value={o.installments} onChange={(e) => setO({ ...o, installments: e.target.value })} placeholder="Ex.: 3X (sem juros)" className={field} />
         </div>
         <div className="sm:col-span-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Observações da matriz</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Observações do atendimento</label>
           <textarea rows={2} value={o.adminNotes} onChange={(e) => setO({ ...o, adminNotes: e.target.value })} className={field}
             placeholder="Ex.: razão do desconto ou do extra; data programada do envio" />
         </div>

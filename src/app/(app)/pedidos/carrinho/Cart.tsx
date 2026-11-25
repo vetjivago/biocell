@@ -167,7 +167,7 @@ export default function Cart({ userId, units, isAdmin }: { userId: string; units
         ) : <p className="text-sm text-gray-700">{units[0]?.name}</p>}
         <div className={`text-sm rounded-lg px-3 py-2 ${belowMin ? "bg-amber-50 text-amber-800" : "bg-gray-50 text-gray-700"}`}>
           Células: <strong>{straws}</strong> palhetas
-          {belowMin && <> — mínimo de {MIN_STRAWS} (faltam {MIN_STRAWS - straws}){isAdmin ? "; a matriz pode lançar assim mesmo" : ""}</>}
+          {belowMin && <> — mínimo de {MIN_STRAWS} (faltam {MIN_STRAWS - straws}){isAdmin ? "; quem atende pode lançar assim mesmo" : ""}</>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Observações (opcional)</label>
@@ -176,7 +176,7 @@ export default function Cart({ userId, units, isAdmin }: { userId: string; units
         </div>
         <div className="border-t border-gray-100 pt-3 text-sm space-y-1">
           <p className="flex justify-between"><span>Subtotal</span><strong>{brl(subtotal)}</strong></p>
-          <p className="text-xs text-gray-500">Frete, gelo seco, desconto e forma de pagamento são definidos pela matriz.</p>
+          <p className="text-xs text-gray-500">Frete, gelo seco, desconto e forma de pagamento são definidos pelo administrativo e pela logística.</p>
         </div>
         <button onClick={checkout} disabled={loading || (!!unitId && !kit)}
           className="w-full flex items-center justify-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50">

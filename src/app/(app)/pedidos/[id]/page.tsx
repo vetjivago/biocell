@@ -22,7 +22,7 @@ function Box({ title, children }: { title: string; children: React.ReactNode }) 
   );
 }
 
-// Pedido no formato da OS de reposição da UABC (imprimível); a matriz ajusta e dá andamento logo abaixo
+// Pedido no formato da OS de reposição da UABC (imprimível); administrativo e logística ajustam e dão andamento logo abaixo
 export default async function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return null;
@@ -149,7 +149,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           <div className="mt-3">
             <Box title="Observações">
               {order.notes && <p className="whitespace-pre-line"><span className="text-gray-500">Unidade:</span> {order.notes}</p>}
-              {order.adminNotes && <p className="whitespace-pre-line"><span className="text-gray-500">Matriz:</span> {order.adminNotes}</p>}
+              {order.adminNotes && <p className="whitespace-pre-line"><span className="text-gray-500">Atendimento:</span> {order.adminNotes}</p>}
             </Box>
           </div>
         )}
