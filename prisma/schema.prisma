@@ -679,9 +679,25 @@ model PurchaseOrder {
   updatedAt     DateTime  @updatedAt
 
   items PurchaseOrderItem[]
+  lines PurchaseOrderLine[]
 
   @@index([unitId])
   @@index([status])
+}
+
+// O que a unidade pôs no carrinho da loja (com o preço do dia); é o que se cobra, além das células
+model PurchaseOrderLine {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  position  Int
+  storeId   String
+  variant   String?
+  name      String
+  quantity  Int
+  unitPrice Int
+
+  @@index([orderId])
 }
 
 model PurchaseOrderItem {

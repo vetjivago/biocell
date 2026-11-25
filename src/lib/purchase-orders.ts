@@ -95,16 +95,21 @@ export const ITEM_PRICES: Record<string, number> = {
 };
 
 type PricedItem = { productId: string; quantity: number };
+type PricedLine = { storeId: string; quantity: number; unitPrice: number };
 
-export function orderTotals(o: { items: PricedItem[]; dryIce: boolean; dryIceQty: number; freight: number; extraValue: number; discount: number }) {
+// Pedido da loja: cobra as células (pelo que vai) + o carrinho (preço do dia, sem as raques).
+// Pedido antigo (sem carrinho): cobra isopor, ringer e equipo pela quantidade enviada, como a planilha
+export function orderTotals(o: { items: PricedItem[]; lines?: PricedLine[]; dryIce: boolean; dryIceQty: number; freight: number; extraValue: number; discount: number }) {
   const qty = (id: string) => o.items.filter((i) => i.productId === id).reduce((s, i) => s + i.quantity, 0);
   const cells = o.items.filter((i) => isCellItem(i.productId)).reduce((s, i) => s + i.quantity, 0) * STRAW_PRICE;
-  const box = qty("prod_caixa_isopor") * ITEM_PRICES.prod_caixa_isopor;
-  const ringer = qty("prod_ringer_lactato") * ITEM_PRICES.prod_ringer_lactato;
-  const equipo = qty("prod_equipo_fotoprotetor") * ITEM_PRICES.prod_equipo_fotoprotetor;
+  const fromStore = !!o.lines?.length;
+  const cart = fromStore ? o.lines!.filter((l) => !l.storeId.startsWith("raque-")).reduce((s, l) => s + l.quantity * l.unitPrice, 0) : 0;
+  const box = fromStore ? 0 : qty("prod_caixa_isopor") * ITEM_PRICES.prod_caixa_isopor;
+  const ringer = fromStore ? 0 : qty("prod_ringer_lactato") * ITEM_PRICES.prod_ringer_lactato;
+  const equipo = fromStore ? 0 : qty("prod_equipo_fotoprotetor") * ITEM_PRICES.prod_equipo_fotoprotetor;
   const dryIce = o.dryIce ? o.dryIceQty * DRY_ICE_PRICE : 0;
-  const total = cells + box + ringer + equipo + dryIce + o.freight + o.extraValue - o.discount;
-  return { cells, box, ringer, equipo, dryIce, total };
+  const total = cells + cart + box + ringer + equipo + dryIce + o.freight + o.extraValue - o.discount;
+  return { cells, cart, box, ringer, equipo, dryIce, total };
 }
 
 export const brl = (cents: number) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

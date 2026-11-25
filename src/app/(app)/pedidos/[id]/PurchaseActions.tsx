@@ -63,7 +63,7 @@ const money = (cents: number) => (cents ? (cents / 100).toFixed(2).replace(".", 
 const toCents = (v: string) => Math.round((parseFloat(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v) || 0) * 100);
 
 // Matriz / logística: ajusta quantidades, informa lotes, logística e financeiro; fatura, envia ou cancela
-export function PurchaseEditor({ order, items }: { order: Order; items: Item[] }) {
+export function PurchaseEditor({ order, items, lines = [] }: { order: Order; items: Item[]; lines?: { storeId: string; quantity: number; unitPrice: number }[] }) {
   const router = useRouter();
   const [rows, setRows] = useState<ItemState[]>(items.map((i) => ({
     id: i.id, productId: i.productId, calculated: i.calculated, quantity: String(i.quantity),
@@ -92,7 +92,8 @@ export function PurchaseEditor({ order, items }: { order: Order; items: Item[] }
     },
   };
   const totals = orderTotals({
-    items: payload.items.map((p, i) => ({ productId: rows[i].productId, quantity: p.quantity, calculated: rows[i].calculated })),
+    items: payload.items.map((p, i) => ({ productId: rows[i].productId, quantity: p.quantity })),
+    lines,
     dryIce: o.dryIce, dryIceQty: payload.order.dryIceQty, freight: payload.order.freight, extraValue: payload.order.extraValue, discount: payload.order.discount,
   });
 

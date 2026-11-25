@@ -2,9 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { seesAllUnits } from "@/lib/roles";
-import { ORDER_STATUS, RACKS, brl, canRequestPurchases, canViewPurchases, isCellItem, orderTotals } from "@/lib/purchase-orders";
+import { ORDER_STATUS, RACKS, brl, canProcessPurchases, canRequestPurchases, canViewPurchases, isCellItem, orderTotals } from "@/lib/purchase-orders";
+import StoreNav from "./StoreNav";
 
 const FILTERS = [
   { key: "abertos", label: "Em aberto" },
@@ -38,7 +38,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
       ...(allUnits ? {} : { unitId: { in: session.unitIds } }),
       ...(unidade ? { unitId: unidade } : {}),
     },
-    include: { unit: { select: { name: true } }, items: { select: { productId: true, quantity: true, calculated: true } } },
+    include: { unit: { select: { name: true } }, items: { select: { productId: true, quantity: true } }, lines: { select: { storeId: true, quantity: true, unitPrice: true } } },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
@@ -52,18 +52,14 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
     return `/pedidos${p.size ? `?${p}` : ""}`;
   };
 
+  // Matriz e logística veem os pedidos de todas as unidades; a unidade, os seus
+  const processor = canProcessPurchases(session.role);
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pedidos de compra</h1>
-          <p className="text-sm text-gray-500 mt-1">A unidade informa as raques; o sistema calcula meios, soros e materiais pelo estoque dela</p>
-        </div>
-        {canRequestPurchases(session.role) && (
-          <Link href="/pedidos/novo" className="flex items-center gap-2 bg-primary hover:bg-primary-light text-white px-4 py-2.5 rounded-lg text-sm font-medium">
-            <Plus size={16} /> Novo pedido
-          </Link>
-        )}
+      <StoreNav userId={session.id} canBuy={canRequestPurchases(session.role)} ordersLabel={processor || !canRequestPurchases(session.role) ? "Pedidos" : "Meus pedidos"} />
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900">{processor ? "Pedidos das unidades" : "Meus pedidos"}</h1>
+        <p className="text-sm text-gray-500 mt-1">Ao fechar o carrinho, meios, soros e materiais das raques são calculados pelo estoque da unidade</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
