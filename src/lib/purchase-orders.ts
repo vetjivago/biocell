@@ -131,9 +131,10 @@ export function canProcessPurchases(role: string) {
   return hasRole(role, "ADMIN", "ADMINISTRATIVE", "STOCK");
 }
 
-// Gestor faz o pedido das suas unidades; quem atende também pode lançar por uma unidade
+// Gestor, veterinário clínico e laboratório fazem o pedido das suas unidades;
+// quem atende também pode lançar por uma unidade
 export function canRequestPurchases(role: string) {
-  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "STOCK", "UNIT_MANAGER");
+  return hasRole(role, "ADMIN", "ADMINISTRATIVE", "STOCK", "UNIT_MANAGER", "PROFESSIONAL", "LAB", "PROFESSIONAL_LAB");
 }
 
 // Quem enxerga a tela de pedidos (o comercial só consulta)
