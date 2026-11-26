@@ -4,8 +4,8 @@ export const ROLES = {
   ADMINISTRATIVE: { label: "Administrativo", description: "Abre novas UABCs, cadastra usuários e atende os pedidos de compra (com a logística)." },
   COMMERCIAL: { label: "Comercial", description: "Só consulta: dashboard, relatórios, pedidos e usuários de todas as unidades, sem alterar nada." },
   UNIT_MANAGER: { label: "Gestor da unidade", description: "Tudo da(s) sua(s) unidade(s), inclusive criar acessos da equipe." },
-  PROFESSIONAL: { label: "Veterinário clínico", description: "Pacientes, prontuários e abertura de Ordens de Serviço." },
-  LAB: { label: "Laboratório / preparo", description: "Fila de Ordens de Serviço, preparo das células e prontuário CT." },
+  PROFESSIONAL: { label: "Veterinário clínico", description: "Pacientes, prontuários, abertura de Ordens de Serviço e pedidos de compra da unidade." },
+  LAB: { label: "Laboratório / preparo", description: "Fila de Ordens de Serviço, preparo das células, prontuário CT e pedidos de compra da unidade." },
   PROFESSIONAL_LAB: { label: "Veterinário clínico + Laboratório", description: "Atende e também prepara as células." },
   STOCK: { label: "Logística (estoque)", description: "Abastece o estoque das unidades, atende os pedidos de compra e acompanha as movimentações." },
 } as const;

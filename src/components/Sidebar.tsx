@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { href: "/pacientes", label: "Pacientes", icon: Users, roles: CLINICAL_ROLES },
   { href: "/ordens-servico", label: "Ordens de serviço", icon: FlaskConical, roles: CLINICAL_ROLES, serviceOrders: true },
   { href: "/estoque", label: "Estoque", icon: Package, roles: null },
-  { href: "/pedidos", label: "Pedidos de compra", icon: ShoppingCart, roles: ["ADMIN", "STOCK", "UNIT_MANAGER", "ADMINISTRATIVE", "COMMERCIAL"] as Role[] },
+  { href: "/pedidos", label: "Pedidos de compra", icon: ShoppingCart, roles: ["ADMIN", "STOCK", "UNIT_MANAGER", "PROFESSIONAL", "LAB", "PROFESSIONAL_LAB", "ADMINISTRATIVE", "COMMERCIAL"] as Role[] },
   { href: "/rastreabilidade", label: "Rastreabilidade", icon: ScanSearch, roles: ["ADMIN", "STOCK", "UNIT_MANAGER"] as Role[] },
   { href: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN", "ADMINISTRATIVE", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
   { href: "/relatorios", label: "Relatórios", icon: FileText, roles: ["ADMIN", "COMMERCIAL", "UNIT_MANAGER"] as Role[] },
